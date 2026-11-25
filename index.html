@@ -1257,6 +1257,81 @@
     box-shadow: 0 2px 4px rgba(95,61,196,0.3);
   }
 
+  /* 銘柄ごとの部数調整エリア */
+  .paper-qty-box {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+  }
+  .paper-qty-title {
+    font-size: 11px;
+    font-weight: bold;
+    color: #495057;
+    margin-bottom: 6px;
+  }
+  .paper-qty-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .paper-qty-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 5px 8px;
+  }
+  .paper-qty-name {
+    font-size: 13px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .paper-qty-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .paper-qty-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .qty-step-btn {
+    width: 30px;
+    height: 28px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    background: #f1f3f5;
+    font-size: 16px;
+    font-weight: bold;
+    color: #212529;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+  .qty-step-btn:active {
+    background: #dee2e6;
+  }
+  .qty-val-label {
+    min-width: 34px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #111;
+  }
+  .qty-val-label.multi {
+    color: #d9480f;
+  }
+
   /* 常時パック1ボタン選択 */
   .pack-single-btn {
     padding: 10px 18px;
@@ -1713,7 +1788,7 @@
       <div class="multi-area-chips" id="multiAreaChips"></div>
     </div>
 
-    <!-- 1. 各紙ごとの合計件数（0件は非表示・MAX赤数字なし） -->
+    <!-- 1. 各紙ごとの合計部数（0件は非表示・MAX赤数字なし） -->
     <div class="summary-grid" id="summarySingleGrid"></div>
 
     <!-- 2. チラシ区分・併読・常時パックの内訳（0件は非表示） -->
@@ -1840,6 +1915,10 @@
       <div class="form-group">
         <label class="form-label">購読新聞（全部外して保存すると「止め客」になります）</label>
         <div class="paper-select-grid" id="paperSelectGrid"></div>
+        <div id="paperQtyBox" class="paper-qty-box" style="display:none;">
+          <div class="paper-qty-title">銘柄ごとの部数（同じ新聞を2部以上とる場合のみ＋）</div>
+          <div class="paper-qty-list" id="paperQtyList"></div>
+        </div>
         <div class="paper-stop-notice" id="paperStopNotice" style="display:none;">
           🛑 新聞の選択がすべて外れています。このまま保存すると配達一覧から消え、「止め客」に顧客情報・履歴が保管されます。
         </div>
@@ -2052,6 +2131,7 @@
 
   let expandedCustomerId = null;
   let selectedPapersTemp = [];
+  let selectedPaperCountsTemp = {};
   let selectedFlyersTemp = [];
   let selectedPackTemp = false;
   let kyukanPapersTemp = [];
@@ -2091,6 +2171,22 @@
 
   function isAlwaysPackCustomer(c) {
     return Boolean(c.pack) || c.packMode === 'always';
+  }
+
+  function getPaperCountForCustomer(c, paperName) {
+    if (c && c.paperCounts && typeof c.paperCounts === 'object') {
+      const val = parseInt(c.paperCounts[paperName], 10);
+      if (val && val > 1) return val;
+    }
+    return 1;
+  }
+
+  function formatPaperItemLabel(paperName, count) {
+    return count > 1 ? `${paperName}×${count}` : paperName;
+  }
+
+  function buildPaperComboKey(c, paperList) {
+    return paperList.map(p => formatPaperItemLabel(p, getPaperCountForCustomer(c, p))).join('＋');
   }
 
   function getPaperTypes() {
@@ -2360,6 +2456,16 @@
     return [];
   }
 
+  function normalizePaperCounts(c, papers) {
+    const result = {};
+    const raw = (c && c.paperCounts && typeof c.paperCounts === 'object') ? c.paperCounts : {};
+    papers.forEach(p => {
+      const n = parseInt(raw[p], 10);
+      result[p] = (n && n > 1) ? n : 1;
+    });
+    return result;
+  }
+
   function normalizeFlyers(c) {
     const masterList = getFlyerTypes();
     if (Array.isArray(c.flyers)) {
@@ -2522,6 +2628,7 @@
           ensureMasterArraysInitialized();
           appData.customers.forEach(c => {
             c.papers = normalizePapers(c);
+            c.paperCounts = normalizePaperCounts(c, c.papers);
             c.flyers = normalizeFlyers(c);
             c.pack = isAlwaysPackCustomer(c);
             if (!c.lastName && c.name) {
@@ -2647,61 +2754,86 @@
     return false;
   }
 
+  function parsePaperToken(token) {
+    const m = token.trim().match(/^(.+?)(?:×(\d+))?$/);
+    if (!m) return { name: token.trim(), count: 1 };
+    return {
+      name: m[1].trim(),
+      count: m[2] ? parseInt(m[2], 10) : 1
+    };
+  }
+
   function classifyReportLog(log) {
     const text = log.text || '';
     const masterPapers = getPaperTypes();
 
     if (text.startsWith('新規登録:')) {
       const bodyOnly = text.replace(/^新規登録:\s*/, '').split(' / ')[0];
-      const rawList = bodyOnly.split('＋').map(s => s.trim()).filter(Boolean);
-      const addedPapers = rawList.filter(p => masterPapers.includes(p));
+      const rawTokens = bodyOnly.split('＋').map(parsePaperToken).filter(t => t.name);
+      const addedPapers = rawTokens.filter(t => masterPapers.includes(t.name));
       return {
         category: 'in',
         badgeClass: 'tag-in',
         badgeText: '新規入り',
-        addedPapers: addedPapers.length > 0 ? addedPapers : rawList,
+        addedPapers: addedPapers.length > 0 ? addedPapers : rawTokens,
         removedPapers: []
       };
     }
 
     if (text.startsWith('再契約（入り）:')) {
-      const rawList = text.replace(/^再契約（入り）:\s*/, '').split('＋').map(s => s.trim()).filter(Boolean);
-      const addedPapers = rawList.filter(p => masterPapers.includes(p));
+      const rawTokens = text.replace(/^再契約（入り）:\s*/, '').split('＋').map(parsePaperToken).filter(t => t.name);
+      const addedPapers = rawTokens.filter(t => masterPapers.includes(t.name));
       return {
         category: 'in',
         badgeClass: 'tag-in',
         badgeText: '再契約入り',
-        addedPapers: addedPapers.length > 0 ? addedPapers : rawList,
+        addedPapers: addedPapers.length > 0 ? addedPapers : rawTokens,
         removedPapers: []
       };
     }
 
     if (text.startsWith('契約止め')) {
       const inner = text.replace(/^契約止め（全紙終了:\s*/, '').replace(/）$/, '');
-      const rawList = inner.split('＋').map(s => s.trim()).filter(Boolean);
-      const removedPapers = rawList.filter(p => masterPapers.includes(p));
+      const rawTokens = inner.split('＋').map(parsePaperToken).filter(t => t.name);
+      const removedPapers = rawTokens.filter(t => masterPapers.includes(t.name));
       return {
         category: 'out',
         badgeClass: 'tag-out',
         badgeText: '契約止め',
         addedPapers: [],
-        removedPapers: removedPapers.length > 0 ? removedPapers : rawList
+        removedPapers: removedPapers.length > 0 ? removedPapers : rawTokens
       };
     }
 
     if (text.startsWith('新聞:')) {
       const body = text.replace(/^新聞:\s*/, '').split('（')[0];
       const arrowParts = body.split('→');
-      const beforeArr = arrowParts[0] ? arrowParts[0].split('＋').map(s => s.trim()).filter(Boolean) : [];
-      const afterArr = arrowParts[1] ? arrowParts[1].split('＋').map(s => s.trim()).filter(Boolean) : [];
-      const added = afterArr.filter(p => !beforeArr.includes(p) && p !== 'なし');
-      const removed = beforeArr.filter(p => !afterArr.includes(p) && p !== 'なし');
+      const beforeMap = {};
+      const afterMap = {};
+      if (arrowParts[0]) {
+        arrowParts[0].split('＋').map(parsePaperToken).filter(t => t.name && t.name !== 'なし').forEach(t => {
+          beforeMap[t.name] = (beforeMap[t.name] || 0) + t.count;
+        });
+      }
+      if (arrowParts[1]) {
+        arrowParts[1].split('＋').map(parsePaperToken).filter(t => t.name && t.name !== 'なし').forEach(t => {
+          afterMap[t.name] = (afterMap[t.name] || 0) + t.count;
+        });
+      }
+      const allKeys = [...new Set([...Object.keys(beforeMap), ...Object.keys(afterMap)])];
+      const added = [];
+      const removed = [];
+      allKeys.forEach(k => {
+        const diff = (afterMap[k] || 0) - (beforeMap[k] || 0);
+        if (diff > 0) added.push({ name: k, count: diff });
+        if (diff < 0) removed.push({ name: k, count: Math.abs(diff) });
+      });
 
       if (added.length > 0 && removed.length === 0) {
         return {
           category: 'in',
           badgeClass: 'tag-in',
-          badgeText: '銘柄追加',
+          badgeText: '増紙・追加',
           addedPapers: added,
           removedPapers: []
         };
@@ -2710,7 +2842,7 @@
         return {
           category: 'out',
           badgeClass: 'tag-out',
-          badgeText: '片方止め',
+          badgeText: '減紙・片方止め',
           addedPapers: [],
           removedPapers: removed
         };
@@ -2825,13 +2957,13 @@
 
     const paperDeltas = {};
     entries.forEach(e => {
-      e.addedPapers.forEach(p => {
-        if (!paperDeltas[p]) paperDeltas[p] = { inCnt: 0, outCnt: 0 };
-        paperDeltas[p].inCnt++;
+      e.addedPapers.forEach(item => {
+        if (!paperDeltas[item.name]) paperDeltas[item.name] = { inCnt: 0, outCnt: 0 };
+        paperDeltas[item.name].inCnt += item.count;
       });
-      e.removedPapers.forEach(p => {
-        if (!paperDeltas[p]) paperDeltas[p] = { inCnt: 0, outCnt: 0 };
-        paperDeltas[p].outCnt++;
+      e.removedPapers.forEach(item => {
+        if (!paperDeltas[item.name]) paperDeltas[item.name] = { inCnt: 0, outCnt: 0 };
+        paperDeltas[item.name].outCnt += item.count;
       });
     });
 
@@ -3104,6 +3236,10 @@
       if (Array.isArray(c.papers)) {
         c.papers = c.papers.map(p => (p === oldName ? trimmed : p));
       }
+      if (c.paperCounts && c.paperCounts[oldName] !== undefined) {
+        c.paperCounts[trimmed] = c.paperCounts[oldName];
+        delete c.paperCounts[oldName];
+      }
       if (Array.isArray(c.pausedPapers)) {
         c.pausedPapers = c.pausedPapers.map(p => (p === oldName ? trimmed : p));
       }
@@ -3136,6 +3272,9 @@
     appData.customers.forEach(c => {
       if (Array.isArray(c.papers)) {
         c.papers = c.papers.filter(p => p !== target);
+      }
+      if (c.paperCounts && c.paperCounts[target] !== undefined) {
+        delete c.paperCounts[target];
       }
       if (Array.isArray(c.pausedPapers)) {
         c.pausedPapers = c.pausedPapers.filter(p => p !== target);
@@ -3494,7 +3633,7 @@
             customer: c,
             badgeType: 'tag-resume',
             badgeText: '本日から再開',
-            detail: normalizePapers(c).join('＋') || log.text
+            detail: buildPaperComboKey(c, normalizePapers(c)) || log.text
           });
         } else if (log.text.startsWith('休刊設定') || log.text.startsWith('休止設定')) {
           alerts.push({
@@ -3816,21 +3955,24 @@
       const papers = pauseInfo.activePapersNow;
       if (papers.length === 0) return;
 
-      totalCopies += papers.length;
+      let customerCopies = 0;
+      papers.forEach(p => {
+        const qty = getPaperCountForCustomer(c, p);
+        customerCopies += qty;
+        if (singleCounts[p] === undefined) {
+          singleCounts[p] = 0;
+        }
+        singleCounts[p] += qty;
+      });
+      totalCopies += customerCopies;
 
       const flyers = normalizeFlyers(c);
       const isMax = flyers.some(f => isMaxCategoryFlyer(f));
       const isNone = flyers.some(f => isNoneCategoryFlyer(f));
 
-      papers.forEach(p => {
-        if (singleCounts[p] === undefined) {
-          singleCounts[p] = 0;
-        }
-        singleCounts[p]++;
-      });
-
-      if (papers.length >= 2) {
-        const comboKey = papers.join('＋');
+      // 2紙以上の併読、または同じ銘柄を2部以上とっている場合は併読・複数部数内訳に表示
+      if (papers.length >= 2 || customerCopies >= 2) {
+        const comboKey = buildPaperComboKey(c, papers);
         if (!comboStats[comboKey]) {
           comboStats[comboKey] = { total: 0, max: 0, none: 0 };
         }
@@ -3841,7 +3983,7 @@
 
       // 常時パック設定先を単体・併読セットごとにカウント
       if (isAlwaysPackCustomer(c)) {
-        const bundleKey = papers.join('＋');
+        const bundleKey = buildPaperComboKey(c, papers);
         if (!packBundleStats[bundleKey]) {
           packBundleStats[bundleKey] = { total: 0, max: 0, none: 0 };
         }
@@ -3855,9 +3997,9 @@
           flyerCounts[f] = 0;
           flyerMaxSubCounts[f] = 0;
         }
-        flyerCounts[f]++;
+        flyerCounts[f] += customerCopies;
         if (isMax && !isMaxCategoryFlyer(f)) {
-          flyerMaxSubCounts[f]++;
+          flyerMaxSubCounts[f] += customerCopies;
         }
       });
     });
@@ -3870,7 +4012,7 @@
     const pausedText = anyPausedCount > 0 ? ` (休刊${anyPausedCount}軒)` : '';
     document.getElementById('summaryTotalCopies').textContent = `配達: ${deliveringCustomers.length}軒 / ${totalCopies}部${pausedText}`;
 
-    // 上段：各銘柄ごとの合計件数（MAX等の赤数字は表示しない）
+    // 上段：各銘柄ごとの合計部数（MAX等の赤数字は表示しない）
     const singleGrid = document.getElementById('summarySingleGrid');
     singleGrid.innerHTML = '';
 
@@ -3890,7 +4032,7 @@
       };
       div.innerHTML = `
         <div class="summary-label">${escapeHtml(paper)}</div>
-        <div class="summary-count">${cnt}<span style="font-size:11px;font-weight:normal;">件</span></div>
+        <div class="summary-count">${cnt}<span style="font-size:11px;font-weight:normal;">部</span></div>
       `;
       singleGrid.appendChild(div);
     });
@@ -3925,7 +4067,7 @@
       };
       div.innerHTML = `
         <span class="summary-label">${escapeHtml(labelText)}</span>
-        <span class="summary-count">${cnt}<span style="font-size:11px;font-weight:normal;">件</span>${subMaxHtml}</span>
+        <span class="summary-count">${cnt}<span style="font-size:11px;font-weight:normal;">部</span>${subMaxHtml}</span>
       `;
       specialList.appendChild(div);
     });
@@ -3944,7 +4086,7 @@
       };
       div.innerHTML = `
         <span class="summary-label">${escapeHtml(comboKey)}</span>
-        <span class="summary-count">${stat.total}<span style="font-size:11px;font-weight:normal;">件</span>${subHtml}</span>
+        <span class="summary-count">${stat.total}<span style="font-size:11px;font-weight:normal;">軒</span>${subHtml}</span>
       `;
       specialList.appendChild(div);
     });
@@ -4063,10 +4205,11 @@
       alert('先に「⚙ 設定」から新聞銘柄を1つ以上登録してください。');
       return;
     }
-    const papersLabel = papers.length > 0 ? papers.join('＋') : defaultPaper;
     if (papers.length === 0) {
       target.papers = [defaultPaper];
+      target.paperCounts = { [defaultPaper]: 1 };
     }
+    const papersLabel = buildPaperComboKey(target, normalizePapers(target));
 
     if (!confirm(`「${target.name}」さんを再契約（入り）として配達リストに戻しますか？\n（新聞：${papersLabel}・住所やメモもそのまま復元されます）`)) {
       return;
@@ -4195,7 +4338,7 @@
     if (!isViewingStopped && activeFilter) {
       bannerEl.style.display = 'flex';
       if (activeFilter.type === 'combo') {
-        document.getElementById('filterBannerText').textContent = `絞り込み：「${activeFilter.value}」（併読）`;
+        document.getElementById('filterBannerText').textContent = `絞り込み：「${activeFilter.value}」（併読・複数）`;
       } else if (activeFilter.type === 'flyer') {
         const label = activeFilter.value === 'MAX' ? 'チラシMAX' : activeFilter.value;
         document.getElementById('filterBannerText').textContent = `絞り込み：${label}`;
@@ -4218,11 +4361,11 @@
         if (activeFilter.type === 'single') {
           return papers.includes(activeFilter.value);
         } else if (activeFilter.type === 'combo') {
-          return papers.join('＋') === activeFilter.value;
+          return buildPaperComboKey(c, papers) === activeFilter.value;
         } else if (activeFilter.type === 'flyer') {
           return flyers.includes(activeFilter.value);
         } else if (activeFilter.type === 'pack') {
-          return isAlwaysPackCustomer(c) && papers.join('＋') === activeFilter.value;
+          return isAlwaysPackCustomer(c) && buildPaperComboKey(c, papers) === activeFilter.value;
         }
         return true;
       });
@@ -4270,16 +4413,20 @@
       const orderText = (c.order !== '' && c.order !== null) ? `順:${c.order}` : '順:-';
       const papers = normalizePapers(c);
       const flyers = normalizeFlyers(c);
-      const activeCount = pauseInfo.isPausedNow ? pauseInfo.activePapersNow.length : papers.length;
+
+      const totalPaperCopies = papers.reduce((sum, p) => sum + getPaperCountForCustomer(c, p), 0);
+      const activePaperCopies = pauseInfo.activePapersNow.reduce((sum, p) => sum + getPaperCountForCustomer(c, p), 0);
       const copiesLabel = pauseInfo.isPartialPausedNow
-        ? `${activeCount}/${papers.length}部`
-        : `${papers.length > 0 ? papers.length : (c.copies || 1)}部`;
+        ? `${activePaperCopies}/${totalPaperCopies}部`
+        : `${totalPaperCopies > 0 ? totalPaperCopies : (c.copies || 1)}部`;
 
       const paperTagsHtml = papers.length > 0
         ? papers.map(p => {
             const isPaperPaused = pauseInfo.pausedPapersNow.includes(p);
             const bgColor = getPaperColor(p);
-            return `<span class="paper-tag${isPaperPaused ? ' paper-paused' : ''}" style="background:${escapeHtml(bgColor)};">${escapeHtml(p)}</span>`;
+            const qty = getPaperCountForCustomer(c, p);
+            const label = formatPaperItemLabel(p, qty);
+            return `<span class="paper-tag${isPaperPaused ? ' paper-paused' : ''}" style="background:${escapeHtml(bgColor)};">${escapeHtml(label)}</span>`;
           }).join('')
         : `<span style="font-size:12px;color:#999;">新聞未選択</span>`;
 
@@ -4468,7 +4615,7 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'stopped-match-btn';
-      const papersLabel = normalizePapers(m).join('＋') || '新聞未設定';
+      const papersLabel = buildPaperComboKey(m, normalizePapers(m)) || '新聞未設定';
       const stopDateText = m.stoppedDate ? `${formatShortDate(m.stoppedDate)}止め` : '止め客';
       const dispAddr = formatDisplayAddress(m);
       btn.innerHTML = `
@@ -4482,6 +4629,7 @@
         openCustomerModal(m.id);
         const restoredPapers = normalizePapers(m);
         selectedPapersTemp = restoredPapers.length > 0 ? [...restoredPapers] : (defaultPaper ? [defaultPaper] : []);
+        selectedPaperCountsTemp = normalizePaperCounts(m, selectedPapersTemp);
         renderPaperButtons();
       };
       listEl.appendChild(btn);
@@ -4560,600 +4708,3 @@
       if (trimmed && !cleanBuildings.includes(trimmed)) {
         cleanBuildings.push(trimmed);
       }
-    });
-
-    if (cleanBuildings.length === 0) return;
-
-    const currentBldgInput = document.getElementById('inputBuilding').value.trim();
-
-    cleanBuildings.forEach(bldg => {
-      const isSelected = (currentBldgInput === bldg);
-      const item = document.createElement('div');
-      item.className = 'town-chip-item building-chip' + (isSelected ? ' selected' : '');
-
-      const selectBtn = document.createElement('button');
-      selectBtn.type = 'button';
-      selectBtn.className = 'town-chip-btn';
-      selectBtn.textContent = bldg;
-      selectBtn.onclick = () => {
-        const bldgInput = document.getElementById('inputBuilding');
-        const roomInput = document.getElementById('inputRoom');
-        bldgInput.value = bldg;
-        renderBuildingButtons();
-        checkStoppedCustomerMatches();
-        roomInput.focus();
-      };
-
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'town-chip-del';
-      delBtn.title = `「${bldg}」を候補から削除`;
-      delBtn.textContent = '×';
-      delBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (confirm(`建物名候補「${bldg}」を削除しますか？\n（登録済みの顧客住所は消えません）`)) {
-          removeBuildingFromArea(selectedArea, bldg);
-        }
-      };
-
-      item.appendChild(selectBtn);
-      item.appendChild(delBtn);
-      wrap.appendChild(item);
-    });
-  }
-
-  function togglePackTemp() {
-    selectedPackTemp = !selectedPackTemp;
-    renderPackButton();
-  }
-
-  function renderPackButton() {
-    const btn = document.getElementById('packSingleBtn');
-    if (!btn) return;
-    if (selectedPackTemp) {
-      btn.classList.add('selected');
-      btn.textContent = '✓ 📦 常時パック';
-    } else {
-      btn.classList.remove('selected');
-      btn.textContent = '📦 常時パック';
-    }
-  }
-
-  function updatePaperSelectionUI() {
-    const notice = document.getElementById('paperStopNotice');
-    const saveBtn = document.getElementById('modalSaveBtn');
-    const editId = document.getElementById('editCustomerId').value;
-    const target = editId ? appData.customers.find(c => c.id === editId) : null;
-
-    if (getPaperTypes().length === 0) {
-      notice.style.display = 'none';
-      saveBtn.classList.remove('stop-mode');
-      saveBtn.textContent = '保存する';
-      return;
-    }
-
-    if (selectedPapersTemp.length === 0) {
-      notice.style.display = 'block';
-      saveBtn.classList.add('stop-mode');
-      saveBtn.textContent = '契約止めとして保存';
-    } else {
-      notice.style.display = 'none';
-      saveBtn.classList.remove('stop-mode');
-      if (target && target.stopped) {
-        saveBtn.textContent = '再契約（入り）として保存';
-      } else {
-        saveBtn.textContent = '保存する';
-      }
-    }
-  }
-
-  function renderPaperButtons() {
-    const grid = document.getElementById('paperSelectGrid');
-    grid.innerHTML = '';
-    const masterPapers = getPaperTypes();
-
-    if (masterPapers.length === 0) {
-      grid.innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:#c92a2a;padding:6px 0;">※新聞銘柄が未登録です。先に「⚙ 設定」から銘柄を追加してください。</div>`;
-      updatePaperSelectionUI();
-      return;
-    }
-
-    masterPapers.forEach(paper => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      const isSelected = selectedPapersTemp.includes(paper);
-      btn.className = 'paper-toggle-btn' + (isSelected ? ' selected' : '');
-      if (isSelected) {
-        const color = getPaperColor(paper);
-        btn.style.background = color;
-        btn.style.borderColor = color;
-      }
-      btn.textContent = (isSelected ? '✓ ' : '') + paper;
-      btn.onclick = () => {
-        if (selectedPapersTemp.includes(paper)) {
-          selectedPapersTemp = selectedPapersTemp.filter(p => p !== paper);
-        } else {
-          selectedPapersTemp.push(paper);
-        }
-        renderPaperButtons();
-        updatePaperSelectionUI();
-      };
-      grid.appendChild(btn);
-    });
-
-    updatePaperSelectionUI();
-  }
-
-  function renderFlyerButtons() {
-    const group = document.getElementById('flyerFormGroup');
-    const grid = document.getElementById('flyerSelectGrid');
-    grid.innerHTML = '';
-    const masterFlyers = getFlyerTypes();
-
-    if (masterFlyers.length === 0) {
-      if (group) group.style.display = 'none';
-      return;
-    }
-    if (group) group.style.display = 'block';
-
-    masterFlyers.forEach(flyerType => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      const isSelected = selectedFlyersTemp.includes(flyerType);
-      const styleKey = getFlyerStyle(flyerType);
-      const activeClass = isSelected ? ` flyer-selected-${styleKey}` : '';
-      btn.className = 'paper-toggle-btn' + activeClass;
-      btn.textContent = (isSelected ? '✓ ' : '') + flyerType;
-      btn.onclick = () => {
-        if (isSelected) {
-          selectedFlyersTemp = selectedFlyersTemp.filter(f => f !== flyerType);
-        } else {
-          if (isMaxCategoryFlyer(flyerType)) {
-            selectedFlyersTemp = selectedFlyersTemp.filter(f => !isNoneCategoryFlyer(f));
-          } else if (isNoneCategoryFlyer(flyerType)) {
-            selectedFlyersTemp = selectedFlyersTemp.filter(f => !isMaxCategoryFlyer(f));
-          }
-          selectedFlyersTemp.push(flyerType);
-        }
-        renderFlyerButtons();
-      };
-      grid.appendChild(btn);
-    });
-  }
-
-  function scrollModalToTop() {
-    const modalContent = document.getElementById('customerModalContent');
-    if (modalContent) {
-      modalContent.scrollTop = 0;
-    }
-  }
-
-  function showContinuousSavedToast(savedName) {
-    const toast = document.getElementById('continuousToast');
-    if (!toast) return;
-    toast.textContent = `✓「${savedName}」を保存！次を入力`;
-    toast.style.display = 'inline-block';
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
-      toast.style.display = 'none';
-    }, 2800);
-  }
-
-  function openCustomerModal(id = null, keepPreviousPlace = false, previousArea = null) {
-    if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
-
-    const areaSelect = document.getElementById('inputArea');
-    areaSelect.innerHTML = '';
-    appData.areas.forEach(a => {
-      const opt = document.createElement('option');
-      opt.value = a;
-      opt.textContent = a;
-      areaSelect.appendChild(opt);
-    });
-
-    const prefix = appData.defaultCity || '';
-    document.getElementById('addressHintText').textContent = prefix
-      ? `※新しい町名を入れると次回から上のボタンで選べます（${prefix}は自動付与／不要な候補は×で削除）`
-      : '※新しい町名を入れると次回から上のボタンで選べます（不要な候補は×で削除）';
-
-    const matchBox = document.getElementById('stoppedMatchBox');
-    matchBox.style.display = 'none';
-    matchBox.innerHTML = '';
-
-    const saveNextBtn = document.getElementById('modalSaveNextBtn');
-    const defaultPaper = getPaperTypes()[0] || '';
-
-    if (id) {
-      const target = appData.customers.find(c => c.id === id);
-      if (!target) return;
-      document.getElementById('modalTitle').textContent = target.stopped ? '止め客情報の編集・再契約' : '顧客情報の編集';
-      document.getElementById('editCustomerId').value = target.id;
-      document.getElementById('inputArea').value = target.area;
-      document.getElementById('inputOrder').value = target.order;
-
-      const splitName = target.lastName !== undefined
-        ? { lastName: target.lastName, firstName: target.firstName || '' }
-        : splitFullName(target.name);
-      document.getElementById('inputLastName').value = splitName.lastName;
-      document.getElementById('inputFirstName').value = splitName.firstName;
-
-      const { town, banchi } = splitTownAndBanchi(target.address);
-      document.getElementById('inputTown').value = town;
-      document.getElementById('inputBanchi').value = banchi;
-      document.getElementById('inputBuilding').value = target.building || '';
-      document.getElementById('inputRoom').value = target.room || '';
-
-      document.getElementById('inputPhone').value = target.phone;
-      selectedPapersTemp = target.stopped ? [] : [...normalizePapers(target)];
-      selectedFlyersTemp = [...normalizeFlyers(target)];
-      selectedPackTemp = isAlwaysPackCustomer(target);
-      document.getElementById('inputMemo').value = target.memo;
-
-      saveNextBtn.style.display = 'none';
-    } else {
-      const targetArea = previousArea || appData.currentArea;
-      const prevTown = keepPreviousPlace ? document.getElementById('inputTown').value.trim() : '';
-      const prevBuilding = keepPreviousPlace ? document.getElementById('inputBuilding').value.trim() : '';
-
-      document.getElementById('modalTitle').textContent = '顧客の追加';
-      document.getElementById('editCustomerId').value = '';
-      document.getElementById('inputArea').value = targetArea;
-      const areaCustomers = appData.customers.filter(c => c.area === targetArea && !c.stopped);
-      const maxOrder = areaCustomers.reduce((max, c) => Math.max(max, Number(c.order) || 0), 0);
-      document.getElementById('inputOrder').value = maxOrder + 1;
-      document.getElementById('inputLastName').value = '';
-      document.getElementById('inputFirstName').value = '';
-      document.getElementById('inputTown').value = prevTown;
-      document.getElementById('inputBanchi').value = '';
-      document.getElementById('inputBuilding').value = prevBuilding;
-      document.getElementById('inputRoom').value = '';
-      document.getElementById('inputPhone').value = '';
-      selectedPapersTemp = defaultPaper ? [defaultPaper] : [];
-      selectedFlyersTemp = [];
-      selectedPackTemp = false;
-      document.getElementById('inputMemo').value = '';
-
-      saveNextBtn.style.display = 'inline-block';
-    }
-
-    renderTownButtons();
-    renderBuildingButtons();
-    renderPaperButtons();
-    renderPackButton();
-    renderFlyerButtons();
-
-    const modalOverlay = document.getElementById('customerModal');
-    modalOverlay.classList.add('open');
-
-    scrollModalToTop();
-    requestAnimationFrame(scrollModalToTop);
-  }
-
-  function closeCustomerModal() {
-    if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
-    scrollModalToTop();
-    document.getElementById('continuousToast').style.display = 'none';
-    document.getElementById('customerModal').classList.remove('open');
-  }
-
-  function recordDiffHistory(oldCust, newCust) {
-    const oldPapers = normalizePapers(oldCust);
-    const newPapers = newCust.papers;
-    const wasStopped = Boolean(oldCust.stopped);
-    const isNowStopped = Boolean(newCust.stopped);
-
-    if (!wasStopped && isNowStopped) {
-      const lastLabel = oldPapers.join('＋') || '購読新聞';
-      pushCustomerHistory(newCust, `契約止め（全紙終了: ${lastLabel}）`, 'out');
-      return;
-    }
-
-    if (wasStopped && !isNowStopped) {
-      pushCustomerHistory(newCust, `再契約（入り）: ${newPapers.join('＋')}`, 'in');
-    } else if (!wasStopped && !isNowStopped && oldPapers.join(',') !== newPapers.join(',')) {
-      const added = newPapers.filter(p => !oldPapers.includes(p));
-      const removed = oldPapers.filter(p => !newPapers.includes(p));
-      const details = [];
-      if (added.length > 0) details.push(`${added.join('・')} 入り`);
-      if (removed.length > 0) details.push(`${removed.join('・')} 止め`);
-      const detailSuffix = details.length > 0 ? `（${details.join(' / ')}）` : '';
-      const logType = (removed.length > 0 && added.length === 0) ? 'out' : ((added.length > 0 && removed.length === 0) ? 'in' : 'change');
-      pushCustomerHistory(
-        newCust,
-        `新聞: ${oldPapers.join('＋') || 'なし'} → ${newPapers.join('＋')}${detailSuffix}`,
-        logType
-      );
-    }
-
-    const oldFlyers = normalizeFlyers(oldCust);
-    const newFlyers = newCust.flyers;
-    if (oldFlyers.join(',') !== newFlyers.join(',')) {
-      const oldLabel = oldFlyers.length > 0 ? oldFlyers.join('・') : '普通';
-      const newLabel = newFlyers.length > 0 ? newFlyers.join('・') : '普通';
-      pushCustomerHistory(newCust, `チラシ: ${oldLabel} → ${newLabel}`, 'change');
-    }
-
-    if (isAlwaysPackCustomer(oldCust) !== isAlwaysPackCustomer(newCust)) {
-      pushCustomerHistory(newCust, isAlwaysPackCustomer(newCust) ? '常時パック: ありに変更' : '常時パック: なしに変更', 'change');
-    }
-  }
-
-  function saveCustomer(continueAdding = false) {
-    const lastName = document.getElementById('inputLastName').value.trim();
-    const firstName = document.getElementById('inputFirstName').value.trim();
-    const fullName = buildFullName(lastName, firstName);
-
-    if (!lastName) {
-      alert('苗字を入力してください。');
-      scrollModalToTop();
-      document.getElementById('inputLastName').focus();
-      return;
-    }
-
-    const id = document.getElementById('editCustomerId').value;
-    const existingCustomer = id ? appData.customers.find(c => c.id === id) : null;
-    const masterPapers = getPaperTypes();
-    const orderedPapers = masterPapers.filter(p => selectedPapersTemp.includes(p));
-
-    if (!existingCustomer && orderedPapers.length === 0) {
-      alert(masterPapers.length === 0
-        ? '先に「⚙ 設定」から新聞銘柄を登録してください。'
-        : '新規追加時は購読新聞を1つ以上選択してください。');
-      return;
-    }
-
-    const willBeStopped = (orderedPapers.length === 0);
-
-    if (existingCustomer && !existingCustomer.stopped && willBeStopped) {
-      if (!confirm(`「${fullName}」さんの新聞選択がすべて外れています。\n\n【契約止め】として配達リストから消し、「止め客」に顧客情報・履歴を保管しますか？`)) {
-        return;
-      }
-    }
-
-    const masterFlyers = getFlyerTypes();
-    const orderedFlyers = masterFlyers.filter(f => selectedFlyersTemp.includes(f));
-    const areaVal = document.getElementById('inputArea').value;
-
-    const rawTown = stripCityPrefix(document.getElementById('inputTown').value);
-    const banchiVal = document.getElementById('inputBanchi').value.trim();
-    const combinedAddress = rawTown + banchiVal;
-
-    const buildingVal = document.getElementById('inputBuilding').value.trim();
-    const roomVal = document.getElementById('inputRoom').value.trim();
-
-    if (rawTown) {
-      registerTownForArea(areaVal, rawTown);
-    }
-    if (buildingVal) {
-      registerBuildingForArea(areaVal, buildingVal);
-    }
-
-    const existingHistory = existingCustomer && Array.isArray(existingCustomer.history)
-      ? [...existingCustomer.history]
-      : [];
-
-    const papersToStore = willBeStopped && existingCustomer
-      ? normalizePapers(existingCustomer)
-      : orderedPapers;
-
-    const autoCopies = papersToStore.length > 0 ? papersToStore.length : 1;
-
-    const stoppedDateVal = willBeStopped
-      ? (existingCustomer && existingCustomer.stopped && existingCustomer.stoppedDate ? existingCustomer.stoppedDate : getTodayStr())
-      : '';
-
-    const isPaused = willBeStopped ? false : (existingCustomer ? Boolean(existingCustomer.paused) : false);
-    const pauseStart = isPaused && existingCustomer ? (existingCustomer.pauseStart || '') : '';
-    const pauseEnd = isPaused && existingCustomer ? (existingCustomer.pauseEnd || '') : '';
-    const pausedPapers = isPaused && existingCustomer && Array.isArray(existingCustomer.pausedPapers)
-      ? existingCustomer.pausedPapers.filter(p => papersToStore.includes(p))
-      : [];
-
-    const customerObj = {
-      id: id || 'cust_' + Date.now(),
-      area: areaVal,
-      order: document.getElementById('inputOrder').value,
-      lastName: lastName,
-      firstName: firstName,
-      name: fullName,
-      address: combinedAddress,
-      building: buildingVal,
-      room: roomVal,
-      phone: document.getElementById('inputPhone').value.trim(),
-      papers: papersToStore,
-      flyers: orderedFlyers,
-      pack: Boolean(selectedPackTemp),
-      copies: autoCopies,
-      memo: document.getElementById('inputMemo').value.trim(),
-      paused: isPaused,
-      pauseStart: pauseStart,
-      pauseEnd: pauseEnd,
-      pausedPapers: pausedPapers,
-      stopped: willBeStopped,
-      stoppedDate: stoppedDateVal,
-      history: existingHistory
-    };
-
-    if (existingCustomer) {
-      recordDiffHistory(existingCustomer, customerObj);
-      const idx = appData.customers.findIndex(c => c.id === id);
-      if (idx !== -1) appData.customers[idx] = customerObj;
-    } else {
-      const packSuffix = customerObj.pack ? ' / 常時パック' : '';
-      pushCustomerHistory(
-        customerObj,
-        `新規登録: ${orderedPapers.join('＋')}${packSuffix}`,
-        'in'
-      );
-      appData.customers.push(customerObj);
-    }
-
-    appData.currentArea = customerObj.area;
-    if (willBeStopped) {
-      expandedCustomerId = null;
-    } else {
-      isViewingStopped = false;
-      expandedCustomerId = customerObj.id;
-    }
-    saveData();
-    renderAll();
-
-    if (continueAdding && !existingCustomer) {
-      openCustomerModal(null, true, areaVal);
-      showContinuousSavedToast(fullName);
-      setTimeout(() => {
-        scrollModalToTop();
-        document.getElementById('inputLastName').focus();
-      }, 30);
-    } else {
-      closeCustomerModal();
-    }
-  }
-
-  function deleteCustomer(id) {
-    const target = appData.customers.find(c => c.id === id);
-    if (!target) return;
-    if (!confirm(`「${target.name}」さんのデータを完全に削除しますか？\n（※履歴や住所もすべて消えます。情報だけ残す場合は「編集」から新聞ボタンを外して保存してください）`)) return;
-
-    appData.customers = appData.customers.filter(c => c.id !== id);
-    if (expandedCustomerId === id) expandedCustomerId = null;
-    saveData();
-    renderAll();
-  }
-
-  function exportBackup() {
-    const dataStr = JSON.stringify(appData, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    a.href = url;
-    a.download = `haitatsu_backup_${dateStr}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  function importBackup(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        const imported = JSON.parse(e.target.result);
-        if (!imported || !Array.isArray(imported.areas) || !Array.isArray(imported.customers)) {
-          alert('正しいバックアップファイルではありません。');
-          return;
-        }
-        if (!confirm('現在のデータを上書きして復元しますか？')) return;
-        appData = imported;
-        if (typeof appData.defaultCity !== 'string') appData.defaultCity = '';
-        if (!appData.areaTowns) appData.areaTowns = {};
-        if (!appData.areaBuildings) appData.areaBuildings = {};
-        ensureMasterArraysInitialized();
-        appData.customers.forEach(c => {
-          c.papers = normalizePapers(c);
-          c.flyers = normalizeFlyers(c);
-          c.pack = isAlwaysPackCustomer(c);
-          if (!c.lastName && c.name) {
-            const split = splitFullName(c.name);
-            c.lastName = split.lastName;
-            c.firstName = split.firstName;
-          }
-          c.name = buildFullName(c.lastName, c.firstName) || c.name || '';
-          c.building = c.building || '';
-          c.room = c.room || '';
-          c.paused = Boolean(c.paused);
-          c.pauseStart = c.pauseStart || '';
-          c.pauseEnd = c.pauseEnd || '';
-          c.pausedPapers = Array.isArray(c.pausedPapers) ? c.pausedPapers : [];
-          c.stopped = Boolean(c.stopped);
-          c.stoppedDate = c.stoppedDate || '';
-          if (!Array.isArray(c.history)) c.history = [];
-        });
-        syncAllTownsAndBuildingsFromCustomers();
-        checkAutoResumeLogs();
-        saveData();
-        renderAll();
-        alert('データの復元が完了しました。');
-      } catch (err) {
-        alert('ファイルの読み込みに失敗しました。');
-      }
-      event.target.value = '';
-    };
-    reader.readAsText(file);
-  }
-
-  function copyTextBackup() {
-    const dataStr = JSON.stringify(appData);
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(dataStr).then(() => {
-        alert('バックアップデータをコピーしました！\nLINEのKeepメモやメモ帳に貼り付けて保管してください。');
-      }).catch(() => {
-        prompt('以下をすべてコピーして保管してください:', dataStr);
-      });
-    } else {
-      prompt('以下をすべてコピーして保管してください:', dataStr);
-    }
-  }
-
-  function restoreTextBackup() {
-    const text = prompt('コピーしておいたバックアップ文字列を貼り付けてください:');
-    if (!text) return;
-    try {
-      const imported = JSON.parse(text.trim());
-      if (!imported || !Array.isArray(imported.areas) || !Array.isArray(imported.customers)) {
-        alert('正しいバックアップデータではありません。');
-        return;
-      }
-      if (!confirm('現在のデータを上書きして復元しますか？')) return;
-      appData = imported;
-      if (typeof appData.defaultCity !== 'string') appData.defaultCity = '';
-      if (!appData.areaTowns) appData.areaTowns = {};
-      if (!appData.areaBuildings) appData.areaBuildings = {};
-      ensureMasterArraysInitialized();
-      appData.customers.forEach(c => {
-        c.papers = normalizePapers(c);
-        c.flyers = normalizeFlyers(c);
-        c.pack = isAlwaysPackCustomer(c);
-        if (!c.lastName && c.name) {
-          const split = splitFullName(c.name);
-          c.lastName = split.lastName;
-          c.firstName = split.firstName;
-        }
-        c.name = buildFullName(c.lastName, c.firstName) || c.name || '';
-        c.building = c.building || '';
-        c.room = c.room || '';
-        c.paused = Boolean(c.paused);
-        c.pauseStart = c.pauseStart || '';
-        c.pauseEnd = c.pauseEnd || '';
-        c.pausedPapers = Array.isArray(c.pausedPapers) ? c.pausedPapers : [];
-        c.stopped = Boolean(c.stopped);
-        c.stoppedDate = c.stoppedDate || '';
-        if (!Array.isArray(c.history)) c.history = [];
-      });
-      syncAllTownsAndBuildingsFromCustomers();
-      checkAutoResumeLogs();
-      saveData();
-      renderAll();
-      alert('データの復元が完了しました。');
-    } catch (e) {
-      alert('データの読み込みに失敗しました。文字列が途中で切れていないか確認してください。');
-    }
-  }
-
-  function escapeHtml(str) {
-    if (str === null || str === undefined) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
-
-  init();
-</script>
-</body>
-</html>
