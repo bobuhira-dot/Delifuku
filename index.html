@@ -322,6 +322,36 @@
     border: 1px solid #339af0;
   }
 
+
+  /* 複数合算時の区域別内訳表示 */
+  .area-breakdown-line {
+    font-size: 11px;
+    font-weight: bold;
+    color: #5f3dc4;
+    margin-top: 3px;
+    line-height: 1.3;
+    word-break: keep-all;
+  }
+  body.loading-mode-active .area-breakdown-line {
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .rain-pack-left {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .rain-area-breakdown {
+    font-size: 11px;
+    font-weight: bold;
+    color: #1971c2;
+    margin-top: 2px;
+    line-height: 1.3;
+  }
+  body.loading-mode-active .rain-area-breakdown {
+    font-size: 13px;
+  }
+
   /* 複数区域合算の選択パネル */
   .multi-area-panel {
     margin-bottom: 8px;
@@ -4104,8 +4134,10 @@
     const anyPausedCount = areaCustomers.filter(c => getPauseStatus(c).isPausedNow).length;
 
     const singleCounts = {};
+    const singleAreaCounts = {};
     masterPapers.forEach(p => {
       singleCounts[p] = 0;
+      singleAreaCounts[p] = {};
     });
 
     const flyerCounts = {};
@@ -4136,8 +4168,11 @@
       papers.forEach(p => {
         if (singleCounts[p] === undefined) {
           singleCounts[p] = 0;
+          singleAreaCounts[p] = {};
         }
-        singleCounts[p] += getPaperCountForCustomer(c, p);
+        const addCnt = getPaperCountForCustomer(c, p);
+        singleCounts[p] += addCnt;
+        singleAreaCounts[p][c.area] = (singleAreaCounts[p][c.area] || 0) + addCnt;
       });
 
       if (papers.length >= 2) {
@@ -4165,12 +4200,13 @@
       if (custTotalCopies >= 2) {
         const rKey = getRainPackKey(c, papers);
         if (!rainPackStats[rKey]) {
-          rainPackStats[rKey] = { total: 0, max: 0 };
+          rainPackStats[rKey] = { total: 0, max: 0, byArea: {} };
         }
         rainPackStats[rKey].total++;
         if (isMax) {
           rainPackStats[rKey].max++;
         }
+        rainPackStats[rKey].byArea[c.area] = (rainPackStats[rKey].byArea[c.area] || 0) + 1;
         totalRainBags++;
       }
 
@@ -4198,6 +4234,14 @@
     const singleGrid = document.getElementById('summarySingleGrid');
     singleGrid.innerHTML = '';
 
+    const formatAreaBreakdown = (byAreaMap) => {
+      if (!isMultiAreaMode || targetAreas.length < 2 || !byAreaMap) return '';
+      const parts = targetAreas
+        .filter(a => (byAreaMap[a] || 0) > 0)
+        .map(a => `${a}:${byAreaMap[a]}`);
+      return parts.length > 0 ? parts.join(' / ') : '';
+    };
+
     let visibleSingleCount = 0;
     masterPapers.forEach(paper => {
       const cnt = singleCounts[paper] || 0;
@@ -4205,6 +4249,10 @@
       visibleSingleCount++;
 
       const isFiltered = activeFilter && activeFilter.type === 'single' && activeFilter.value === paper;
+      const areaBreakdownText = formatAreaBreakdown(singleAreaCounts[paper]);
+      const areaBreakdownHtml = areaBreakdownText
+        ? `<div class="area-breakdown-line">${escapeHtml(areaBreakdownText)}</div>`
+        : '';
 
       const div = document.createElement('div');
       div.className = 'summary-item' + (isFiltered ? ' filter-active' : '');
@@ -4215,6 +4263,7 @@
       div.innerHTML = `
         <div class="summary-label">${escapeHtml(paper)}</div>
         <div class="summary-count">${cnt}<span style="font-size:11px;font-weight:normal;">部</span></div>
+        ${areaBreakdownHtml}
       `;
       singleGrid.appendChild(div);
     });
@@ -4344,6 +4393,10 @@
         rainEntries.forEach(([rKey, stat]) => {
           const isFiltered = activeFilter && activeFilter.type === 'rain_pack' && activeFilter.value === rKey;
           const maxHtml = stat.max > 0 ? `<span class="max-sub-count">(${stat.max})</span>` : '';
+          const rainAreaText = formatAreaBreakdown(stat.byArea);
+          const rainAreaHtml = rainAreaText
+            ? `<span class="rain-area-breakdown">${escapeHtml(rainAreaText)}</span>`
+            : '';
           const row = document.createElement('div');
           row.className = 'rain-pack-row' + (isFiltered ? ' filter-active' : '');
           row.onclick = () => {
@@ -4351,7 +4404,10 @@
             toggleFilter('rain_pack', rKey);
           };
           row.innerHTML = `
-            <span class="rain-pack-label">${escapeHtml(rKey)}</span>
+            <div class="rain-pack-left">
+              <span class="rain-pack-label">${escapeHtml(rKey)}</span>
+              ${rainAreaHtml}
+            </div>
             <span class="rain-pack-count">${stat.total}<span style="font-size:12px;font-weight:normal;">部</span>${maxHtml}</span>
           `;
           rainList.appendChild(row);
