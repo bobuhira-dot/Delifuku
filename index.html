@@ -1873,7 +1873,7 @@
     <!-- 2. 雨の日パック内訳（雨の日モードON時のみ表示） -->
     <div class="rain-summary-panel" id="rainSummaryPanel" style="display:none;">
       <div class="rain-panel-header">
-        <span>☔ 雨の日パック準備内訳（タップで絞り込み）</span>
+        <span>☔ 雨の日 合併パック内訳（タップで絞り込み）</span>
         <span class="rain-total-badge" id="rainTotalBags">合計 0部</span>
       </div>
       <div class="rain-pack-list" id="rainPackList"></div>
@@ -4099,16 +4099,18 @@
         if (isNone) packBundleStats[bundleKey].none++;
       }
 
-      // 雨の日用：配達中の全軒をカウント（MAXは同じ行内の赤カッコで集計）
-      const rKey = getRainPackKey(c, papers);
-      if (!rainPackStats[rKey]) {
-        rainPackStats[rKey] = { total: 0, max: 0 };
+      // 雨の日用：併読または複数部数（合併パック対象）のみカウント（単紙1部は除外）
+      if (custTotalCopies >= 2) {
+        const rKey = getRainPackKey(c, papers);
+        if (!rainPackStats[rKey]) {
+          rainPackStats[rKey] = { total: 0, max: 0 };
+        }
+        rainPackStats[rKey].total++;
+        if (isMax) {
+          rainPackStats[rKey].max++;
+        }
+        totalRainBags++;
       }
-      rainPackStats[rKey].total++;
-      if (isMax) {
-        rainPackStats[rKey].max++;
-      }
-      totalRainBags++;
 
       flyers.forEach(f => {
         if (flyerCounts[f] === undefined) {
@@ -4275,7 +4277,7 @@
 
       const rainEntries = Object.entries(rainPackStats).sort((a, b) => b[1].total - a[1].total);
       if (rainEntries.length === 0) {
-        rainList.innerHTML = `<div style="font-size:12px;color:#555;padding:4px 0;">配達対象がありません</div>`;
+        rainList.innerHTML = `<div style="font-size:12px;color:#555;padding:4px 0;">合併パック対象がありません</div>`;
       } else {
         rainEntries.forEach(([rKey, stat]) => {
           const isFiltered = activeFilter && activeFilter.type === 'rain_pack' && activeFilter.value === rKey;
@@ -4522,7 +4524,7 @@
         } else if (activeFilter.type === 'pack') {
           return isAlwaysPackCustomer(c) && getActiveBundleKey(c, papers) === activeFilter.value;
         } else if (activeFilter.type === 'rain_pack') {
-          return getRainPackKey(c, papers) === activeFilter.value;
+          return getTotalCopiesForPapers(c, papers) >= 2 && getRainPackKey(c, papers) === activeFilter.value;
         }
         return true;
       });
@@ -4594,8 +4596,8 @@
       let packTagHtml = '';
       if (isAlwaysPackCustomer(c)) {
         packTagHtml = `<span class="pack-tag">📦 常時パック</span>`;
-      } else if (isRainMode && !c.stopped && !pauseInfo.isFullPausedNow) {
-        packTagHtml = `<span class="rain-pack-tag">☔ 雨パック</span>`;
+      } else if (isRainMode && !c.stopped && !pauseInfo.isFullPausedNow && activeCustomerCopies >= 2) {
+        packTagHtml = `<span class="rain-pack-tag">☔ 合併パック</span>`;
       }
 
       const flyerTagsHtml = flyers.map(f => {
