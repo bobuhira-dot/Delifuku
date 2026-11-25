@@ -200,21 +200,6 @@
     flex-wrap: wrap;
     gap: 5px;
   }
-  .rain-mode-btn {
-    background: #fff;
-    color: #1971c2;
-    border: 1.5px solid #339af0;
-    border-radius: 6px;
-    padding: 3px 8px;
-    font-size: 11px;
-    font-weight: bold;
-    cursor: pointer;
-  }
-  .rain-mode-btn.active {
-    background: #1971c2;
-    border-color: #1971c2;
-    color: #fff;
-  }
   .multi-area-btn {
     background: #fff;
     color: var(--danger);
@@ -342,14 +327,6 @@
   .summary-item.pack-summary-item .summary-label,
   .summary-item.pack-summary-item .summary-count {
     color: #087f5b;
-  }
-  .summary-item.rain-pack-summary-item {
-    background: #e7f5ff;
-    border-color: #339af0;
-  }
-  .summary-item.rain-pack-summary-item .summary-label,
-  .summary-item.rain-pack-summary-item .summary-count {
-    color: #1864ab;
   }
   .summary-item.flyer-pill-red {
     background: #fff5f5;
@@ -1722,7 +1699,6 @@
       <span id="summaryAreaName">1区 購読集計</span>
       <div class="summary-title-right">
         <span id="summaryTotalCopies">配達: 0軒 / 0部</span>
-        <button type="button" id="rainModeBtn" class="rain-mode-btn" onclick="toggleRainMode()">🌧️ 雨の日</button>
         <button type="button" id="multiAreaBtn" class="multi-area-btn" onclick="toggleMultiAreaMode()">複数合算</button>
         <button type="button" id="loadingModeBtn" class="loading-mode-btn" onclick="toggleLoadingMode()">積込モード</button>
       </div>
@@ -1740,7 +1716,7 @@
     <!-- 1. 各紙ごとの合計件数（0件は非表示・MAX赤数字なし） -->
     <div class="summary-grid" id="summarySingleGrid"></div>
 
-    <!-- 2. チラシ区分・併読・パックの内訳（0件は非表示） -->
+    <!-- 2. チラシ区分・併読・常時パックの内訳（0件は非表示） -->
     <div class="summary-sub-wrap" id="summarySpecialWrap">
       <div class="summary-section-label">▼ チラシ・併読・パックの内訳（<span style="color:#e03131;">赤</span> / <span style="color:#1971c2;">青</span>・タップで絞り込み）</div>
       <div class="summary-badge-list" id="summarySpecialList"></div>
@@ -1872,7 +1848,6 @@
       <div class="form-group">
         <label class="form-label">パック包装（晴れの日でも毎回ビニールに包む家だけ選択）</label>
         <button type="button" id="packSingleBtn" class="pack-single-btn" onclick="togglePackTemp()">📦 常時パック</button>
-        <div class="form-hint">※雨の日に全軒パックする場合は集計欄の「🌧️ 雨の日」ボタンで全件カウントできます</div>
       </div>
 
       <div class="form-group" id="flyerFormGroup">
@@ -2082,7 +2057,6 @@
   let kyukanPapersTemp = [];
   let activeFilter = null;
   let isLoadingMode = false;
-  let isRainMode = false;
   let isViewingStopped = false;
   let isMultiAreaMode = false;
   let multiSelectedAreas = [];
@@ -2117,10 +2091,6 @@
 
   function isAlwaysPackCustomer(c) {
     return Boolean(c.pack) || c.packMode === 'always';
-  }
-
-  function isPackTargetToday(c) {
-    return isRainMode || isAlwaysPackCustomer(c);
   }
 
   function getPaperTypes() {
@@ -3416,21 +3386,6 @@
     renderAll();
   }
 
-  // 雨の日モードのON/OFF（ON時は全配達先をパック対象として集計）
-  function toggleRainMode() {
-    isRainMode = !isRainMode;
-    const btn = document.getElementById('rainModeBtn');
-    if (isRainMode) {
-      btn.classList.add('active');
-      btn.textContent = '🌧️ 雨の日ON';
-    } else {
-      btn.classList.remove('active');
-      btn.textContent = '🌧️ 雨の日';
-    }
-    renderSummary();
-    renderCustomers();
-  }
-
   // 複数区域合算モードのON/OFF
   function toggleMultiAreaMode() {
     isMultiAreaMode = !isMultiAreaMode;
@@ -3884,8 +3839,8 @@
         if (isNone) comboStats[comboKey].none++;
       }
 
-      // 雨の日ONなら全配達先、晴れの日なら「常時パック」設定先を単体・併読セットごとにカウント
-      if (isPackTargetToday(c)) {
+      // 常時パック設定先を単体・併読セットごとにカウント
+      if (isAlwaysPackCustomer(c)) {
         const bundleKey = papers.join('＋');
         if (!packBundleStats[bundleKey]) {
           packBundleStats[bundleKey] = { total: 0, max: 0, none: 0 };
@@ -3944,7 +3899,7 @@
       singleGrid.innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:#888;padding:4px 0;">登録データがありません</div>`;
     }
 
-    // 下段：チラシ・併読・パックの内訳（MAX赤数字はこちらのみに表示）
+    // 下段：チラシ・併読・常時パックの内訳（MAX赤数字はこちらのみに表示）
     const specialWrap = document.getElementById('summarySpecialWrap');
     const specialList = document.getElementById('summarySpecialList');
     specialList.innerHTML = '';
@@ -3994,7 +3949,7 @@
       specialList.appendChild(div);
     });
 
-    // パック内訳（単体パック・併読セットパック単位で表示）
+    // 常時パック内訳（単体パック・併読セットパック単位で表示）
     const packEntries = Object.entries(packBundleStats).sort((a, b) => b[1].total - a[1].total);
     packEntries.forEach(([bundleKey, pStat]) => {
       if (!pStat || pStat.total === 0) return;
@@ -4002,16 +3957,14 @@
 
       const isPackFiltered = activeFilter && activeFilter.type === 'pack' && activeFilter.value === bundleKey;
       const subHtml = buildSubCountHtml(pStat.max, pStat.none);
-      const packPrefix = isRainMode ? '🌧️ パック' : '📦 パック';
-      const itemClass = isRainMode ? 'rain-pack-summary-item' : 'pack-summary-item';
       const packDiv = document.createElement('div');
-      packDiv.className = `summary-item pill-item ${itemClass}` + (isPackFiltered ? ' filter-active' : '');
+      packDiv.className = 'summary-item pill-item pack-summary-item' + (isPackFiltered ? ' filter-active' : '');
       packDiv.onclick = () => {
         if (isLoadingMode) return;
         toggleFilter('pack', bundleKey);
       };
       packDiv.innerHTML = `
-        <span class="summary-label">${packPrefix} ${escapeHtml(bundleKey)}</span>
+        <span class="summary-label">📦 パック ${escapeHtml(bundleKey)}</span>
         <span class="summary-count">${pStat.total}<span style="font-size:11px;font-weight:normal;">部</span>${subHtml}</span>
       `;
       specialList.appendChild(packDiv);
@@ -4269,7 +4222,7 @@
         } else if (activeFilter.type === 'flyer') {
           return flyers.includes(activeFilter.value);
         } else if (activeFilter.type === 'pack') {
-          return isPackTargetToday(c) && papers.join('＋') === activeFilter.value;
+          return isAlwaysPackCustomer(c) && papers.join('＋') === activeFilter.value;
         }
         return true;
       });
