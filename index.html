@@ -1016,18 +1016,18 @@
     font-size: 11px;
   }
 
-  /* ストリートビュー・地図ボタン */
+  /* 地図・カーナビボタン（Googleマップ / Yahoo!カーナビ） */
   .map-btn-group {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
     margin: 10px 0;
   }
-  .btn-sv {
+  .btn-map {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #e67e22;
+    background: #2e7d32;
     color: #fff;
     text-decoration: none;
     font-weight: bold;
@@ -1036,11 +1036,11 @@
     border-radius: 8px;
     text-align: center;
   }
-  .btn-map {
+  .btn-yahoo {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #2e7d32;
+    background: #ff0033;
     color: #fff;
     text-decoration: none;
     font-weight: bold;
@@ -1438,6 +1438,17 @@
     border-color: #1864ab;
     color: #ffffff;
   }
+
+  .weekday-btn:disabled,
+  .weekday-btn.is-global-disabled {
+    background: #e9ecef !important;
+    border-color: #ced4da !important;
+    color: #adb5bd !important;
+    cursor: not-allowed;
+    opacity: 0.65;
+    text-decoration: line-through;
+  }
+
   .settings-paper-block {
     background: #fff;
     border: 1px solid #dee2e6;
@@ -2390,6 +2401,12 @@
   }
 
   const WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+  // 表示・ソート順：月(1), 火(2), 水(3), 木(4), 金(5), 土(6), 日(0)
+  const DISPLAY_WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+  function sortWeekdaysMonToSun(dayIndices) {
+    return [...new Set(dayIndices)].sort((a, b) => DISPLAY_WEEKDAY_ORDER.indexOf(a) - DISPLAY_WEEKDAY_ORDER.indexOf(b));
+  }
 
   function getTodayWeekdayIndex() {
     return new Date().getDay(); // 0:日, 1:月, ..., 6:土
@@ -2413,7 +2430,7 @@
 
   function formatWeekdayListShort(dayIndices) {
     if (!Array.isArray(dayIndices) || dayIndices.length === 0) return '';
-    const sorted = [...new Set(dayIndices)].sort((a, b) => a - b);
+    const sorted = sortWeekdaysMonToSun(dayIndices);
     return sorted.map(d => WEEKDAY_NAMES[d] || '').filter(Boolean).join('・');
   }
 
@@ -3408,7 +3425,8 @@
         const usageCount = appData.customers.filter(c => normalizePapers(c).includes(paper)).length;
 
         const closedDays = getPaperClosedDays(paper);
-        const dayBtnsHtml = WEEKDAY_NAMES.map((wName, dIdx) => {
+        const dayBtnsHtml = DISPLAY_WEEKDAY_ORDER.map(dIdx => {
+          const wName = WEEKDAY_NAMES[dIdx];
           const isClosed = closedDays.includes(dIdx);
           const sunSatClass = dIdx === 0 ? ' is-sun' : (dIdx === 6 ? ' is-sat' : '');
           return `<button type="button" class="weekday-btn${sunSatClass}${isClosed ? ' active' : ''}" onclick="togglePaperClosedDay('${escapeHtml(paper)}', ${dIdx})">${wName}</button>`;
@@ -3529,7 +3547,16 @@
     if (cur.includes(dayIdx)) {
       appData.paperClosedDays[paperName] = cur.filter(d => d !== dayIdx);
     } else {
-      appData.paperClosedDays[paperName] = [...cur, dayIdx].sort((a, b) => a - b);
+      appData.paperClosedDays[paperName] = sortWeekdaysMonToSun([...cur, dayIdx]);
+      // 銘柄全体で休刊にした曜日は、顧客側の個別曜日休みから外す
+      appData.customers.forEach(c => {
+        if (c.weeklyPausedPapers && Array.isArray(c.weeklyPausedPapers[paperName])) {
+          c.weeklyPausedPapers[paperName] = c.weeklyPausedPapers[paperName].filter(d => d !== dayIdx);
+          if (c.weeklyPausedPapers[paperName].length === 0) {
+            delete c.weeklyPausedPapers[paperName];
+          }
+        }
+      });
     }
     saveData();
     renderSettingsLists();
@@ -4997,12 +5024,12 @@
       if (fullAddr) {
         const encodedAddr = encodeURIComponent(fullAddr);
         const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddr}`;
-        const svUrl = `https://maps.google.com/maps?q=${encodedAddr}&layer=c`;
+        const yahooNaviUrl = `yjcarnavi://navi/select?q=${encodedAddr}`;
 
         mapButtonsHtml = `
           <div class="map-btn-group" onclick="event.stopPropagation()">
-            <a href="${svUrl}" target="_blank" rel="noopener" class="btn-sv">🏠 ストリートビュー</a>
             <a href="${mapUrl}" target="_blank" rel="noopener" class="btn-map">🗺️ Googleマップ</a>
+            <a href="${yahooNaviUrl}" class="btn-yahoo">🚗 Yahoo!カーナビ</a>
           </div>
         `;
       } else {
@@ -5334,6 +5361,7 @@
   }
 
   function toggleWeeklyPausedTemp(paper, dayIdx) {
+    if (getPaperClosedDays(paper).includes(dayIdx)) return;
     if (!selectedWeeklyPausedTemp || typeof selectedWeeklyPausedTemp !== 'object') {
       selectedWeeklyPausedTemp = {};
     }
@@ -5341,7 +5369,7 @@
     if (cur.includes(dayIdx)) {
       selectedWeeklyPausedTemp[paper] = cur.filter(d => d !== dayIdx);
     } else {
-      selectedWeeklyPausedTemp[paper] = [...cur, dayIdx].sort((a, b) => a - b);
+      selectedWeeklyPausedTemp[paper] = sortWeekdaysMonToSun([...cur, dayIdx]);
     }
     renderPaperButtons();
   }
@@ -5358,22 +5386,24 @@
 
     orderedSelected.forEach(paper => {
       const cnt = parseInt(selectedPaperCountsTemp[paper], 10) || 1;
-      const custWeeklyDays = (selectedWeeklyPausedTemp && Array.isArray(selectedWeeklyPausedTemp[paper]))
-        ? selectedWeeklyPausedTemp[paper]
-        : [];
       const globalClosedDays = getPaperClosedDays(paper);
+      const custWeeklyDays = (selectedWeeklyPausedTemp && Array.isArray(selectedWeeklyPausedTemp[paper]))
+        ? selectedWeeklyPausedTemp[paper].filter(d => !globalClosedDays.includes(d))
+        : [];
 
-      const dayBtnsHtml = WEEKDAY_NAMES.map((wName, dIdx) => {
-        const isCustOff = custWeeklyDays.includes(dIdx);
+      const dayBtnsHtml = DISPLAY_WEEKDAY_ORDER.map(dIdx => {
+        const wName = WEEKDAY_NAMES[dIdx];
         const isGlobalOff = globalClosedDays.includes(dIdx);
+        const isCustOff = !isGlobalOff && custWeeklyDays.includes(dIdx);
         const sunSatClass = dIdx === 0 ? ' is-sun' : (dIdx === 6 ? ' is-sat' : '');
-        const titleAttr = isGlobalOff ? ` title="${paper}は銘柄全体で${wName}曜休刊設定済"` : '';
-        const globalStyle = (isGlobalOff && !isCustOff) ? ' style="opacity:0.45;"' : '';
-        return `<button type="button" class="weekday-btn${sunSatClass}${isCustOff ? ' active' : ''}"${titleAttr}${globalStyle} onclick="toggleWeeklyPausedTemp('${escapeHtml(paper)}', ${dIdx})">${wName}</button>`;
+        if (isGlobalOff) {
+          return `<button type="button" class="weekday-btn${sunSatClass} is-global-disabled" disabled title="${escapeHtml(paper)}は定例休刊日のため選択不可">${wName}</button>`;
+        }
+        return `<button type="button" class="weekday-btn${sunSatClass}${isCustOff ? ' active' : ''}" onclick="toggleWeeklyPausedTemp('${escapeHtml(paper)}', ${dIdx})">${wName}</button>`;
       }).join('');
 
       const globalNoteHtml = globalClosedDays.length > 0
-        ? `<div class="weekly-pause-note">※${escapeHtml(paper)}は設定で毎週「${escapeHtml(formatWeekdayListShort(globalClosedDays))}」休刊です</div>`
+        ? `<div class="weekly-pause-note">※${escapeHtml(paper)}は「${escapeHtml(formatWeekdayListShort(globalClosedDays))}」が定例休刊のため選択不可</div>`
         : '';
 
       const row = document.createElement('div');
@@ -5719,8 +5749,12 @@
       } else {
         const val = parseInt(selectedPaperCountsTemp[p], 10);
         countsToStore[p] = (!isNaN(val) && val >= 1) ? val : 1;
-        if (selectedWeeklyPausedTemp && Array.isArray(selectedWeeklyPausedTemp[p]) && selectedWeeklyPausedTemp[p].length > 0) {
-          weeklyPausedToStore[p] = [...selectedWeeklyPausedTemp[p]].sort((a, b) => a - b);
+        const globalOffForPaper = getPaperClosedDays(p);
+        const filteredCustDays = (selectedWeeklyPausedTemp && Array.isArray(selectedWeeklyPausedTemp[p]))
+          ? selectedWeeklyPausedTemp[p].filter(d => !globalOffForPaper.includes(d))
+          : [];
+        if (filteredCustDays.length > 0) {
+          weeklyPausedToStore[p] = sortWeekdaysMonToSun(filteredCustDays);
         }
       }
     });
