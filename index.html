@@ -233,18 +233,20 @@
 
   /* 雨の日モードボタン＆集計パネル */
   .rain-mode-btn {
-    background: #1971c2;
-    color: #fff;
-    border: none;
+    background: #ffffff;
+    color: #1971c2;
+    border: 1.5px solid #1971c2;
     border-radius: 6px;
-    padding: 4px 9px;
+    padding: 3px 8px;
     font-size: 11px;
     font-weight: bold;
     cursor: pointer;
   }
   .rain-mode-btn.active {
-    background: #0b5ed7;
-    box-shadow: 0 0 0 2px #74c0fc;
+    background: #1971c2;
+    border-color: #1971c2;
+    color: #ffffff;
+    box-shadow: 0 2px 5px rgba(25, 113, 194, 0.35);
   }
   .rain-summary-panel {
     margin-top: 8px;
@@ -1872,7 +1874,7 @@
     <div class="rain-summary-panel" id="rainSummaryPanel" style="display:none;">
       <div class="rain-panel-header">
         <span>☔ 雨の日パック準備内訳（タップで絞り込み）</span>
-        <span class="rain-total-badge" id="rainTotalBags">合計 0袋</span>
+        <span class="rain-total-badge" id="rainTotalBags">合計 0部</span>
       </div>
       <div class="rain-pack-list" id="rainPackList"></div>
     </div>
@@ -3611,11 +3613,10 @@
     renderCustomers();
   }
 
-  // 雨の日の1袋（1軒）あたりのパック内容ラベルを生成
-  // 例: 「読売＋三条」「読売(チラシなし)＋報知」「読売(MAX)」「読売×2」
+  // 雨の日の1パックあたりの組み合わせキーを生成（MAXは別行にせず同じグループにまとめる）
   function getRainPackKey(c, activePapers) {
-    const flyers = normalizeFlyers(c);
-    const flyerSuffix = flyers.length > 0 ? `(${flyers.join('・')})` : '';
+    const nonMaxFlyers = normalizeFlyers(c).filter(f => !isMaxCategoryFlyer(f));
+    const flyerSuffix = nonMaxFlyers.length > 0 ? `(${nonMaxFlyers.join('・')})` : '';
     const papersPart = activePapers.map(p => {
       const cnt = getPaperCountForCustomer(c, p);
       return cnt > 1 ? `${p}×${cnt}` : p;
@@ -4098,12 +4099,15 @@
         if (isNone) packBundleStats[bundleKey].none++;
       }
 
-      // 雨の日用：配達中の全軒（セット＋チラシ区分別）をカウント
+      // 雨の日用：配達中の全軒をカウント（MAXは同じ行内の赤カッコで集計）
       const rKey = getRainPackKey(c, papers);
       if (!rainPackStats[rKey]) {
-        rainPackStats[rKey] = 0;
+        rainPackStats[rKey] = { total: 0, max: 0 };
       }
-      rainPackStats[rKey]++;
+      rainPackStats[rKey].total++;
+      if (isMax) {
+        rainPackStats[rKey].max++;
+      }
       totalRainBags++;
 
       flyers.forEach(f => {
@@ -4266,15 +4270,16 @@
     const rainTotalBadge = document.getElementById('rainTotalBags');
     if (isRainMode) {
       rainPanel.style.display = 'block';
-      rainTotalBadge.textContent = `合計 ${totalRainBags}袋`;
+      rainTotalBadge.textContent = `合計 ${totalRainBags}部`;
       rainList.innerHTML = '';
 
-      const rainEntries = Object.entries(rainPackStats).sort((a, b) => b[1] - a[1]);
+      const rainEntries = Object.entries(rainPackStats).sort((a, b) => b[1].total - a[1].total);
       if (rainEntries.length === 0) {
         rainList.innerHTML = `<div style="font-size:12px;color:#555;padding:4px 0;">配達対象がありません</div>`;
       } else {
-        rainEntries.forEach(([rKey, count]) => {
+        rainEntries.forEach(([rKey, stat]) => {
           const isFiltered = activeFilter && activeFilter.type === 'rain_pack' && activeFilter.value === rKey;
+          const maxHtml = stat.max > 0 ? `<span class="max-sub-count">(${stat.max})</span>` : '';
           const row = document.createElement('div');
           row.className = 'rain-pack-row' + (isFiltered ? ' filter-active' : '');
           row.onclick = () => {
@@ -4283,7 +4288,7 @@
           };
           row.innerHTML = `
             <span class="rain-pack-label">${escapeHtml(rKey)}</span>
-            <span class="rain-pack-count">${count}<span style="font-size:12px;font-weight:normal;">部(袋)</span></span>
+            <span class="rain-pack-count">${stat.total}<span style="font-size:12px;font-weight:normal;">部</span>${maxHtml}</span>
           `;
           rainList.appendChild(row);
         });
