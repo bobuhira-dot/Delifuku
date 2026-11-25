@@ -230,6 +230,96 @@
     color: #fff;
   }
 
+
+  /* 雨の日モードボタン＆集計パネル */
+  .rain-mode-btn {
+    background: #1971c2;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .rain-mode-btn.active {
+    background: #0b5ed7;
+    box-shadow: 0 0 0 2px #74c0fc;
+  }
+  .rain-summary-panel {
+    margin-top: 8px;
+    padding: 10px;
+    background: #e7f5ff;
+    border: 2px solid #339af0;
+    border-radius: 8px;
+  }
+  .rain-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: bold;
+    color: #1864ab;
+    margin-bottom: 8px;
+  }
+  .rain-total-badge {
+    background: #1971c2;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+  .rain-pack-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .rain-pack-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #a5d8ff;
+    border-left: 5px solid #1971c2;
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .rain-pack-row.filter-active {
+    background: #d0ebff;
+    border-color: #1864ab;
+    box-shadow: 0 0 0 2px rgba(25, 113, 194, 0.3);
+  }
+  .rain-pack-label {
+    font-size: 14px;
+    font-weight: bold;
+    color: #111;
+    line-height: 1.35;
+  }
+  .rain-pack-count {
+    font-size: 17px;
+    font-weight: bold;
+    color: #1864ab;
+    white-space: nowrap;
+    margin-left: 8px;
+  }
+  body.loading-mode-active .rain-pack-label {
+    font-size: 16px;
+  }
+  body.loading-mode-active .rain-pack-count {
+    font-size: 22px;
+  }
+  .rain-pack-tag {
+    font-size: 12px;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 5px;
+    background: #e7f5ff;
+    color: #1864ab;
+    border: 1px solid #339af0;
+  }
+
   /* 複数区域合算の選択パネル */
   .multi-area-panel {
     margin-bottom: 8px;
@@ -1760,6 +1850,7 @@
       <span id="summaryAreaName">1区 購読集計</span>
       <div class="summary-title-right">
         <span id="summaryTotalCopies">配達: 0軒 / 0部</span>
+        <button type="button" id="rainModeBtn" class="rain-mode-btn" onclick="toggleRainMode()">☔ 雨の日</button>
         <button type="button" id="multiAreaBtn" class="multi-area-btn" onclick="toggleMultiAreaMode()">複数合算</button>
         <button type="button" id="loadingModeBtn" class="loading-mode-btn" onclick="toggleLoadingMode()">積込モード</button>
       </div>
@@ -1777,7 +1868,16 @@
     <!-- 1. 各紙ごとの合計部数（0件は非表示） -->
     <div class="summary-grid" id="summarySingleGrid"></div>
 
-    <!-- 2. チラシ区分・併読・常時パックの内訳（0件は非表示） -->
+    <!-- 2. 雨の日パック内訳（雨の日モードON時のみ表示） -->
+    <div class="rain-summary-panel" id="rainSummaryPanel" style="display:none;">
+      <div class="rain-panel-header">
+        <span>☔ 雨の日パック準備内訳（タップで絞り込み）</span>
+        <span class="rain-total-badge" id="rainTotalBags">合計 0袋</span>
+      </div>
+      <div class="rain-pack-list" id="rainPackList"></div>
+    </div>
+
+    <!-- 3. チラシ区分・併読・常時パックの内訳（0件は非表示） -->
     <div class="summary-sub-wrap" id="summarySpecialWrap">
       <div class="summary-section-label">▼ チラシ・併読・パックの内訳（<span style="color:#e03131;">赤</span> / <span style="color:#1971c2;">青</span>・タップで絞り込み）</div>
       <div class="summary-badge-list" id="summarySpecialList"></div>
@@ -2120,6 +2220,7 @@
   let kyukanPapersTemp = [];
   let activeFilter = null;
   let isLoadingMode = false;
+  let isRainMode = false;
   let isViewingStopped = false;
   let isMultiAreaMode = false;
   let multiSelectedAreas = [];
@@ -3493,6 +3594,35 @@
     renderAll();
   }
 
+  function toggleRainMode() {
+    isRainMode = !isRainMode;
+    const btn = document.getElementById('rainModeBtn');
+    if (isRainMode) {
+      btn.classList.add('active');
+      btn.textContent = '☔ 雨の日ON';
+    } else {
+      btn.classList.remove('active');
+      btn.textContent = '☔ 雨の日';
+      if (activeFilter && activeFilter.type === 'rain_pack') {
+        activeFilter = null;
+      }
+    }
+    renderSummary();
+    renderCustomers();
+  }
+
+  // 雨の日の1袋（1軒）あたりのパック内容ラベルを生成
+  // 例: 「読売＋三条」「読売(チラシなし)＋報知」「読売(MAX)」「読売×2」
+  function getRainPackKey(c, activePapers) {
+    const flyers = normalizeFlyers(c);
+    const flyerSuffix = flyers.length > 0 ? `(${flyers.join('・')})` : '';
+    const papersPart = activePapers.map(p => {
+      const cnt = getPaperCountForCustomer(c, p);
+      return cnt > 1 ? `${p}×${cnt}` : p;
+    }).join('＋');
+    return `${papersPart}${flyerSuffix}`;
+  }
+
   // 複数区域合算モードのON/OFF
   function toggleMultiAreaMode() {
     isMultiAreaMode = !isMultiAreaMode;
@@ -3924,6 +4054,8 @@
 
     const comboStats = {};
     const packBundleStats = {};
+    const rainPackStats = {};
+    let totalRainBags = 0;
     let totalCopies = 0;
 
     deliveringCustomers.forEach(c => {
@@ -3965,6 +4097,14 @@
         if (isMax) packBundleStats[bundleKey].max++;
         if (isNone) packBundleStats[bundleKey].none++;
       }
+
+      // 雨の日用：配達中の全軒（セット＋チラシ区分別）をカウント
+      const rKey = getRainPackKey(c, papers);
+      if (!rainPackStats[rKey]) {
+        rainPackStats[rKey] = 0;
+      }
+      rainPackStats[rKey]++;
+      totalRainBags++;
 
       flyers.forEach(f => {
         if (flyerCounts[f] === undefined) {
@@ -4119,6 +4259,38 @@
     }
 
     specialWrap.style.display = visibleSpecialCount > 0 ? 'block' : 'none';
+
+    // 雨の日パック内訳パネル描画
+    const rainPanel = document.getElementById('rainSummaryPanel');
+    const rainList = document.getElementById('rainPackList');
+    const rainTotalBadge = document.getElementById('rainTotalBags');
+    if (isRainMode) {
+      rainPanel.style.display = 'block';
+      rainTotalBadge.textContent = `合計 ${totalRainBags}袋`;
+      rainList.innerHTML = '';
+
+      const rainEntries = Object.entries(rainPackStats).sort((a, b) => b[1] - a[1]);
+      if (rainEntries.length === 0) {
+        rainList.innerHTML = `<div style="font-size:12px;color:#555;padding:4px 0;">配達対象がありません</div>`;
+      } else {
+        rainEntries.forEach(([rKey, count]) => {
+          const isFiltered = activeFilter && activeFilter.type === 'rain_pack' && activeFilter.value === rKey;
+          const row = document.createElement('div');
+          row.className = 'rain-pack-row' + (isFiltered ? ' filter-active' : '');
+          row.onclick = () => {
+            if (isLoadingMode) return;
+            toggleFilter('rain_pack', rKey);
+          };
+          row.innerHTML = `
+            <span class="rain-pack-label">${escapeHtml(rKey)}</span>
+            <span class="rain-pack-count">${count}<span style="font-size:12px;font-weight:normal;">部(袋)</span></span>
+          `;
+          rainList.appendChild(row);
+        });
+      }
+    } else {
+      rainPanel.style.display = 'none';
+    }
   }
 
   function toggleCard(id) {
@@ -4320,6 +4492,8 @@
         document.getElementById('filterBannerText').textContent = `絞り込み：${label}`;
       } else if (activeFilter.type === 'pack') {
         document.getElementById('filterBannerText').textContent = `絞り込み：📦 パック「${activeFilter.value}」`;
+      } else if (activeFilter.type === 'rain_pack') {
+        document.getElementById('filterBannerText').textContent = `絞り込み：☔ 雨パック「${activeFilter.value}」`;
       } else if (activeFilter.type === 'paused') {
         document.getElementById('filterBannerText').textContent = `絞り込み：現在休刊中`;
       } else {
@@ -4342,6 +4516,8 @@
           return flyers.includes(activeFilter.value);
         } else if (activeFilter.type === 'pack') {
           return isAlwaysPackCustomer(c) && getActiveBundleKey(c, papers) === activeFilter.value;
+        } else if (activeFilter.type === 'rain_pack') {
+          return getRainPackKey(c, papers) === activeFilter.value;
         }
         return true;
       });
@@ -4410,9 +4586,12 @@
           }).join('')
         : `<span style="font-size:12px;color:#999;">新聞未選択</span>`;
 
-      const packTagHtml = isAlwaysPackCustomer(c)
-        ? `<span class="pack-tag">📦 パック</span>`
-        : '';
+      let packTagHtml = '';
+      if (isAlwaysPackCustomer(c)) {
+        packTagHtml = `<span class="pack-tag">📦 常時パック</span>`;
+      } else if (isRainMode && !c.stopped && !pauseInfo.isFullPausedNow) {
+        packTagHtml = `<span class="rain-pack-tag">☔ 雨パック</span>`;
+      }
 
       const flyerTagsHtml = flyers.map(f => {
         const label = f === 'MAX' ? 'チラシMAX' : f;
