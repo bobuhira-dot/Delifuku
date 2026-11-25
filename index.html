@@ -311,6 +311,14 @@
     background: #f3f0ff;
     border-color: #b197fc;
   }
+  .summary-item.pack-summary-item {
+    background: #e6fcf5;
+    border-color: #38d9a9;
+  }
+  .summary-item.pack-summary-item .summary-label,
+  .summary-item.pack-summary-item .summary-count {
+    color: #087f5b;
+  }
   .summary-item.flyer-pill-red {
     background: #fff5f5;
     border-color: #ffa8a8;
@@ -689,7 +697,7 @@
     flex-shrink: 0;
   }
 
-  /* 顧客カード内の新聞・チラシバッジ群 */
+  /* 顧客カード内の新聞・チラシ・パックバッジ群 */
   .paper-badges-wrap {
     display: flex;
     flex-wrap: wrap;
@@ -708,6 +716,15 @@
   .paper-tag.paper-paused {
     opacity: 0.45;
     text-decoration: line-through;
+  }
+  .pack-tag {
+    font-size: 12px;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 5px;
+    background: #e6fcf5;
+    color: #087f5b;
+    border: 1px solid #38d9a9;
   }
 
   /* チラシ専用バッジ */
@@ -1231,6 +1248,28 @@
     box-shadow: 0 2px 4px rgba(95,61,196,0.3);
   }
 
+  /* パック（ビニール包装）選択ボタン */
+  .pack-toggle-btn {
+    width: 100%;
+    padding: 11px 12px;
+    font-size: 14px;
+    font-weight: bold;
+    border: 2px solid #ced4da;
+    border-radius: 8px;
+    background: #f8f9fa;
+    color: #495057;
+    cursor: pointer;
+    text-align: center;
+    user-select: none;
+    transition: all 0.12s;
+  }
+  .pack-toggle-btn.selected {
+    background: #099268;
+    border-color: #099268;
+    color: #ffffff;
+    box-shadow: 0 2px 5px rgba(9, 146, 104, 0.3);
+  }
+
   /* 新聞全解除（止め）警告バナー */
   .paper-stop-notice {
     margin-top: 8px;
@@ -1644,7 +1683,7 @@
     <button type="button" class="btn-save" style="padding:6px 12px;font-size:12px;white-space:nowrap;" onclick="openSettingsModal()">設定を開く</button>
   </div>
 
-  <!-- 中部：赤枠の購読数・チラシ集計エリア -->
+  <!-- 中部：赤枠の購読数・チラシ・パック集計エリア -->
   <div class="summary-box">
     <div class="summary-title">
       <span id="summaryAreaName">1区 購読集計</span>
@@ -1664,12 +1703,12 @@
       <div class="multi-area-chips" id="multiAreaChips"></div>
     </div>
 
-    <!-- 1. 各紙ごとの合計件数（0件は非表示） -->
+    <!-- 1. 各紙ごとの合計件数（0件は非表示・MAX赤数字なし） -->
     <div class="summary-grid" id="summarySingleGrid"></div>
 
-    <!-- 2. チラシ区分 ＆ 併読の内訳（0件は非表示） -->
+    <!-- 2. チラシ区分・併読・パックの内訳（0件は非表示） -->
     <div class="summary-sub-wrap" id="summarySpecialWrap">
-      <div class="summary-section-label">▼ チラシ・併読の内訳（<span style="color:#e03131;">赤</span> / <span style="color:#1971c2;">青</span>・タップで絞り込み）</div>
+      <div class="summary-section-label">▼ チラシ・併読・パックの内訳（<span style="color:#e03131;">赤</span> / <span style="color:#1971c2;">青</span>・タップで絞り込み）</div>
       <div class="summary-badge-list" id="summarySpecialList"></div>
     </div>
   </div>
@@ -1691,7 +1730,7 @@
 
   <!-- 検索＆新規追加 -->
   <div class="control-bar">
-    <input type="text" id="searchInput" class="search-input" placeholder="名前・町名・建物・銘柄・メモで検索..." oninput="renderCustomers()">
+    <input type="text" id="searchInput" class="search-input" placeholder="名前・町名・建物・銘柄・パック・メモで検索..." oninput="renderCustomers()">
     <button type="button" class="add-customer-btn" onclick="openCustomerModal()">＋ 顧客追加</button>
   </div>
 
@@ -1794,6 +1833,12 @@
         <div class="paper-stop-notice" id="paperStopNotice" style="display:none;">
           🛑 新聞の選択がすべて外れています。このまま保存すると配達一覧から消え、「止め客」に顧客情報・履歴が保管されます。
         </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">パック包装（天気に関わらず毎回ビニールに包む家）</label>
+        <button type="button" id="packToggleBtn" class="pack-toggle-btn" onclick="togglePackTemp()">📦 常時パック：なし（通常）</button>
+        <div class="form-hint">※ONにすると必要パック部数が自動カウントされ、カードに「📦パック」が表示されます</div>
       </div>
 
       <div class="form-group" id="flyerFormGroup">
@@ -1983,7 +2028,6 @@
     purple: '紫'
   };
 
-  // 初期状態は地域・銘柄・チラシ区分すべて空のクリーン設定
   let appData = {
     defaultCity: '',
     areas: ['1区', '2区', '3区', '4区'],
@@ -2000,6 +2044,7 @@
   let expandedCustomerId = null;
   let selectedPapersTemp = [];
   let selectedFlyersTemp = [];
+  let selectedPackTemp = false;
   let kyukanPapersTemp = [];
   let activeFilter = null;
   let isLoadingMode = false;
@@ -2446,6 +2491,7 @@
           appData.customers.forEach(c => {
             c.papers = normalizePapers(c);
             c.flyers = normalizeFlyers(c);
+            c.pack = Boolean(c.pack);
             if (!c.lastName && c.name) {
               const split = splitFullName(c.name);
               c.lastName = split.lastName;
@@ -3717,12 +3763,8 @@
     const anyPausedCount = areaCustomers.filter(c => getPauseStatus(c).isPausedNow).length;
 
     const singleCounts = {};
-    const singleMaxCounts = {};
-    const singleNoneCounts = {};
     masterPapers.forEach(p => {
       singleCounts[p] = 0;
-      singleMaxCounts[p] = 0;
-      singleNoneCounts[p] = 0;
     });
 
     const flyerCounts = {};
@@ -3734,6 +3776,8 @@
 
     const comboStats = {};
     let totalCopies = 0;
+    let packTotalCopies = 0;
+    let packHouseholds = 0;
 
     deliveringCustomers.forEach(c => {
       const pauseInfo = getPauseStatus(c);
@@ -3741,6 +3785,11 @@
       if (papers.length === 0) return;
 
       totalCopies += papers.length;
+      if (c.pack) {
+        packTotalCopies += papers.length;
+        packHouseholds += 1;
+      }
+
       const flyers = normalizeFlyers(c);
       const isMax = flyers.some(f => isMaxCategoryFlyer(f));
       const isNone = flyers.some(f => isNoneCategoryFlyer(f));
@@ -3748,12 +3797,8 @@
       papers.forEach(p => {
         if (singleCounts[p] === undefined) {
           singleCounts[p] = 0;
-          singleMaxCounts[p] = 0;
-          singleNoneCounts[p] = 0;
         }
         singleCounts[p]++;
-        if (isMax) singleMaxCounts[p]++;
-        if (isNone) singleNoneCounts[p]++;
       });
 
       if (papers.length >= 2) {
@@ -3786,6 +3831,7 @@
     const pausedText = anyPausedCount > 0 ? ` (休刊${anyPausedCount}軒)` : '';
     document.getElementById('summaryTotalCopies').textContent = `配達: ${deliveringCustomers.length}軒 / ${totalCopies}部${pausedText}`;
 
+    // 上段：各銘柄ごとの合計件数（MAX等の赤数字は表示しない）
     const singleGrid = document.getElementById('summarySingleGrid');
     singleGrid.innerHTML = '';
 
@@ -3795,10 +3841,7 @@
       if (cnt === 0) return;
       visibleSingleCount++;
 
-      const maxCnt = singleMaxCounts[paper] || 0;
-      const noneCnt = singleNoneCounts[paper] || 0;
       const isFiltered = activeFilter && activeFilter.type === 'single' && activeFilter.value === paper;
-      const subHtml = buildSubCountHtml(maxCnt, noneCnt);
 
       const div = document.createElement('div');
       div.className = 'summary-item' + (isFiltered ? ' filter-active' : '');
@@ -3808,7 +3851,7 @@
       };
       div.innerHTML = `
         <div class="summary-label">${escapeHtml(paper)}</div>
-        <div class="summary-count">${cnt}<span style="font-size:11px;font-weight:normal;">件</span>${subHtml}</div>
+        <div class="summary-count">${cnt}<span style="font-size:11px;font-weight:normal;">件</span></div>
       `;
       singleGrid.appendChild(div);
     });
@@ -3817,6 +3860,7 @@
       singleGrid.innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:#888;padding:4px 0;">登録データがありません</div>`;
     }
 
+    // 下段：チラシ・併読・パックの内訳（MAX赤数字はこちらのみに表示）
     const specialWrap = document.getElementById('summarySpecialWrap');
     const specialList = document.getElementById('summarySpecialList');
     specialList.innerHTML = '';
@@ -3865,6 +3909,26 @@
       `;
       specialList.appendChild(div);
     });
+
+    // パック必要部数のカウントバッジ
+    if (packTotalCopies > 0) {
+      visibleSpecialCount++;
+      const isPackFiltered = activeFilter && activeFilter.type === 'pack';
+      const packDiv = document.createElement('div');
+      packDiv.className = 'summary-item pill-item pack-summary-item' + (isPackFiltered ? ' filter-active' : '');
+      packDiv.onclick = () => {
+        if (isLoadingMode) return;
+        toggleFilter('pack', 'true');
+      };
+      const householdSub = packHouseholds !== packTotalCopies
+        ? `<span style="font-size:11px;font-weight:normal;">(${packHouseholds}軒)</span>`
+        : '';
+      packDiv.innerHTML = `
+        <span class="summary-label">📦 パック</span>
+        <span class="summary-count">${packTotalCopies}<span style="font-size:11px;font-weight:normal;">部</span>${householdSub}</span>
+      `;
+      specialList.appendChild(packDiv);
+    }
 
     if (anyPausedCount > 0) {
       visibleSpecialCount++;
@@ -3997,6 +4061,7 @@
     if (!keyword) return true;
     const papersStr = normalizePapers(c).join(' ').toLowerCase();
     const flyersStr = normalizeFlyers(c).join(' ').toLowerCase();
+    const packStr = c.pack ? 'パック ビニール 袋' : '';
     const historyStr = Array.isArray(c.history)
       ? c.history.map(h => h.text || '').join(' ').toLowerCase()
       : '';
@@ -4008,6 +4073,7 @@
       (c.memo && c.memo.toLowerCase().includes(keyword)) ||
       papersStr.includes(keyword) ||
       flyersStr.includes(keyword) ||
+      packStr.includes(keyword) ||
       historyStr.includes(keyword);
   }
 
@@ -4093,6 +4159,8 @@
       } else if (activeFilter.type === 'flyer') {
         const label = activeFilter.value === 'MAX' ? 'チラシMAX' : activeFilter.value;
         document.getElementById('filterBannerText').textContent = `絞り込み：${label}`;
+      } else if (activeFilter.type === 'pack') {
+        document.getElementById('filterBannerText').textContent = `絞り込み：📦 常時パック対象`;
       } else if (activeFilter.type === 'paused') {
         document.getElementById('filterBannerText').textContent = `絞り込み：現在休刊中`;
       } else {
@@ -4113,6 +4181,8 @@
           return papers.join('＋') === activeFilter.value;
         } else if (activeFilter.type === 'flyer') {
           return flyers.includes(activeFilter.value);
+        } else if (activeFilter.type === 'pack') {
+          return Boolean(c.pack);
         }
         return true;
       });
@@ -4172,6 +4242,10 @@
             return `<span class="paper-tag${isPaperPaused ? ' paper-paused' : ''}" style="background:${escapeHtml(bgColor)};">${escapeHtml(p)}</span>`;
           }).join('')
         : `<span style="font-size:12px;color:#999;">新聞未選択</span>`;
+
+      const packTagHtml = c.pack
+        ? `<span class="pack-tag">📦 パック</span>`
+        : '';
 
       const flyerTagsHtml = flyers.map(f => {
         const label = f === 'MAX' ? 'チラシMAX' : f;
@@ -4274,7 +4348,7 @@
           </div>
           <span class="copies-badge">${copiesLabel}</span>
         </div>
-        <div class="paper-badges-wrap">${paperTagsHtml}${flyerTagsHtml}</div>
+        <div class="paper-badges-wrap">${paperTagsHtml}${packTagHtml}${flyerTagsHtml}</div>
         <div class="card-address-preview">${addressHtml}</div>
         ${c.memo ? `<div class="memo-preview">📝 ${escapeHtml(c.memo)}</div>` : ''}
 
@@ -4488,6 +4562,23 @@
     });
   }
 
+  function togglePackTemp() {
+    selectedPackTemp = !selectedPackTemp;
+    renderPackButton();
+  }
+
+  function renderPackButton() {
+    const btn = document.getElementById('packToggleBtn');
+    if (!btn) return;
+    if (selectedPackTemp) {
+      btn.classList.add('selected');
+      btn.textContent = '✓ 📦 常時パック：あり（毎回ビニール包装）';
+    } else {
+      btn.classList.remove('selected');
+      btn.textContent = '📦 常時パック：なし（通常）';
+    }
+  }
+
   function updatePaperSelectionUI() {
     const notice = document.getElementById('paperStopNotice');
     const saveBtn = document.getElementById('modalSaveBtn');
@@ -4655,6 +4746,7 @@
       document.getElementById('inputPhone').value = target.phone;
       selectedPapersTemp = target.stopped ? [] : [...normalizePapers(target)];
       selectedFlyersTemp = [...normalizeFlyers(target)];
+      selectedPackTemp = Boolean(target.pack);
       document.getElementById('inputMemo').value = target.memo;
 
       saveNextBtn.style.display = 'none';
@@ -4678,6 +4770,7 @@
       document.getElementById('inputPhone').value = '';
       selectedPapersTemp = defaultPaper ? [defaultPaper] : [];
       selectedFlyersTemp = [];
+      selectedPackTemp = false;
       document.getElementById('inputMemo').value = '';
 
       saveNextBtn.style.display = 'inline-block';
@@ -4686,6 +4779,7 @@
     renderTownButtons();
     renderBuildingButtons();
     renderPaperButtons();
+    renderPackButton();
     renderFlyerButtons();
 
     const modalOverlay = document.getElementById('customerModal');
@@ -4737,6 +4831,10 @@
       const oldLabel = oldFlyers.length > 0 ? oldFlyers.join('・') : '普通';
       const newLabel = newFlyers.length > 0 ? newFlyers.join('・') : '普通';
       pushCustomerHistory(newCust, `チラシ: ${oldLabel} → ${newLabel}`, 'change');
+    }
+
+    if (Boolean(oldCust.pack) !== Boolean(newCust.pack)) {
+      pushCustomerHistory(newCust, newCust.pack ? '常時パック: ありに変更' : '常時パック: なしに変更', 'change');
     }
   }
 
@@ -4824,6 +4922,7 @@
       phone: document.getElementById('inputPhone').value.trim(),
       papers: papersToStore,
       flyers: orderedFlyers,
+      pack: Boolean(selectedPackTemp),
       copies: autoCopies,
       memo: document.getElementById('inputMemo').value.trim(),
       paused: isPaused,
@@ -4840,9 +4939,10 @@
       const idx = appData.customers.findIndex(c => c.id === id);
       if (idx !== -1) appData.customers[idx] = customerObj;
     } else {
+      const packSuffix = customerObj.pack ? ' / パックあり' : '';
       pushCustomerHistory(
         customerObj,
-        `新規登録: ${orderedPapers.join('＋')}`,
+        `新規登録: ${orderedPapers.join('＋')}${packSuffix}`,
         'in'
       );
       appData.customers.push(customerObj);
@@ -4915,6 +5015,7 @@
         appData.customers.forEach(c => {
           c.papers = normalizePapers(c);
           c.flyers = normalizeFlyers(c);
+          c.pack = Boolean(c.pack);
           if (!c.lastName && c.name) {
             const split = splitFullName(c.name);
             c.lastName = split.lastName;
@@ -4975,6 +5076,7 @@
       appData.customers.forEach(c => {
         c.papers = normalizePapers(c);
         c.flyers = normalizeFlyers(c);
+        c.pack = Boolean(c.pack);
         if (!c.lastName && c.name) {
           const split = splitFullName(c.name);
           c.lastName = split.lastName;
