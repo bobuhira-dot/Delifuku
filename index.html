@@ -1833,6 +1833,8 @@
       <button type="button" class="area-manage-btn report-btn" onclick="openMonthlyReportModal()">📊 入り止め</button>
       <button type="button" id="stoppedToggleBtn" class="area-manage-btn stopped-view-btn" onclick="toggleStoppedView()">止め客(0)</button>
       <button type="button" class="area-manage-btn" onclick="normalizeAreaOrders()">順振り直し</button>
+      <button type="button" class="area-manage-btn" title="選択中の区域タブを左へ移動" onclick="moveCurrentAreaTab(-1)">◀タブ</button>
+      <button type="button" class="area-manage-btn" title="選択中の区域タブを右へ移動" onclick="moveCurrentAreaTab(1)">タブ▶</button>
       <button type="button" class="area-manage-btn" onclick="renameCurrentArea()">区域名変更</button>
       <button type="button" class="area-manage-btn" style="color:#d93025;" onclick="deleteCurrentArea()">区域削除</button>
       <button type="button" class="area-manage-btn reload-btn" onclick="forceReloadApp()">🔄 アプリ更新</button>
@@ -2157,7 +2159,16 @@
         <div class="form-hint">※「赤」にした区分は集計ボックスの赤内訳、「青」は青内訳に自動カウントされます</div>
       </div>
 
-      <!-- 3. 基本住所の設定 -->
+      <!-- 3. 区域の並び替え -->
+      <div class="settings-section">
+        <div class="settings-section-title">
+          <span>🗂 区域タブの並び替え</span>
+        </div>
+        <div class="settings-item-list" id="settingsAreaList"></div>
+        <div class="form-hint">※▲▼ボタンで上部タブの表示順を自由に入れ替えられます</div>
+      </div>
+
+      <!-- 4. 基本住所の設定 -->
       <div class="settings-section">
         <div class="settings-section-title">
           <span>📍 地図検索用の基本住所</span>
@@ -3235,6 +3246,28 @@
         flyerListEl.appendChild(row);
       });
     }
+
+    const areaListEl = document.getElementById('settingsAreaList');
+    if (areaListEl) {
+      areaListEl.innerHTML = '';
+      appData.areas.forEach((area, idx) => {
+        const activeCnt = appData.customers.filter(c => c.area === area && !c.stopped).length;
+        const isCur = area === appData.currentArea;
+        const row = document.createElement('div');
+        row.className = 'settings-item-row';
+        row.innerHTML = `
+          <div class="settings-item-left">
+            <span class="settings-item-name" style="${isCur ? 'color:var(--primary);' : ''}">${escapeHtml(area)}${isCur ? '（表示中）' : ''}</span>
+            <span class="settings-item-sub">(${activeCnt}軒)</span>
+          </div>
+          <div class="settings-item-actions">
+            <button type="button" class="settings-mini-btn" ${idx === 0 ? 'disabled style="opacity:0.4;"' : ''} onclick="moveAreaByIndex(${idx}, -1)">▲</button>
+            <button type="button" class="settings-mini-btn" ${idx === appData.areas.length - 1 ? 'disabled style="opacity:0.4;"' : ''} onclick="moveAreaByIndex(${idx}, 1)">▼</button>
+          </div>
+        `;
+        areaListEl.appendChild(row);
+      });
+    }
   }
 
   function addPaperType() {
@@ -3928,6 +3961,37 @@
     activeFilter = null;
     saveData();
     renderAll();
+  }
+
+  function moveCurrentAreaTab(dir) {
+    const idx = appData.areas.indexOf(appData.currentArea);
+    if (idx === -1) return;
+    moveAreaByIndex(idx, dir, true);
+  }
+
+  function moveAreaByIndex(idx, dir, scrollToActiveTab = false) {
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= appData.areas.length) return;
+    const tmp = appData.areas[idx];
+    appData.areas[idx] = appData.areas[swapIdx];
+    appData.areas[swapIdx] = tmp;
+
+    if (Array.isArray(multiSelectedAreas) && multiSelectedAreas.length > 0) {
+      multiSelectedAreas = appData.areas.filter(a => multiSelectedAreas.includes(a));
+    }
+
+    saveData();
+    if (document.getElementById('settingsModal').classList.contains('open')) {
+      renderSettingsLists();
+    }
+    renderAll();
+
+    if (scrollToActiveTab) {
+      const activeTab = document.querySelector('#tabBar .tab-item.active');
+      if (activeTab && activeTab.scrollIntoView) {
+        activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
   }
 
   function renameCurrentArea() {
