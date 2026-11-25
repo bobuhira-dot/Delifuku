@@ -1838,7 +1838,7 @@
       <div class="form-group">
         <label class="form-label">パック包装（天気に関わらず毎回ビニールに包む家）</label>
         <button type="button" id="packToggleBtn" class="pack-toggle-btn" onclick="togglePackTemp()">📦 常時パック：なし（通常）</button>
-        <div class="form-hint">※ONにすると必要パック部数が自動カウントされ、カードに「📦パック」が表示されます</div>
+        <div class="form-hint">※ONにすると銘柄ごとのパック必要部数が自動カウントされ、カードに「📦パック」が表示されます</div>
       </div>
 
       <div class="form-group" id="flyerFormGroup">
@@ -2620,7 +2620,8 @@
     const masterPapers = getPaperTypes();
 
     if (text.startsWith('新規登録:')) {
-      const rawList = text.replace(/^新規登録:\s*/, '').split('＋').map(s => s.trim()).filter(Boolean);
+      const bodyOnly = text.replace(/^新規登録:\s*/, '').split(' / ')[0];
+      const rawList = bodyOnly.split('＋').map(s => s.trim()).filter(Boolean);
       const addedPapers = rawList.filter(p => masterPapers.includes(p));
       return {
         category: 'in',
@@ -3076,7 +3077,7 @@
       }
     });
 
-    if (activeFilter && activeFilter.type === 'single' && activeFilter.value === oldName) {
+    if (activeFilter && (activeFilter.type === 'single' || activeFilter.type === 'pack') && activeFilter.value === oldName) {
       activeFilter.value = trimmed;
     } else if (activeFilter && activeFilter.type === 'combo') {
       activeFilter = null;
@@ -3763,8 +3764,10 @@
     const anyPausedCount = areaCustomers.filter(c => getPauseStatus(c).isPausedNow).length;
 
     const singleCounts = {};
+    const packPaperStats = {};
     masterPapers.forEach(p => {
       singleCounts[p] = 0;
+      packPaperStats[p] = { total: 0, max: 0, none: 0 };
     });
 
     const flyerCounts = {};
@@ -3776,8 +3779,6 @@
 
     const comboStats = {};
     let totalCopies = 0;
-    let packTotalCopies = 0;
-    let packHouseholds = 0;
 
     deliveringCustomers.forEach(c => {
       const pauseInfo = getPauseStatus(c);
@@ -3785,10 +3786,6 @@
       if (papers.length === 0) return;
 
       totalCopies += papers.length;
-      if (c.pack) {
-        packTotalCopies += papers.length;
-        packHouseholds += 1;
-      }
 
       const flyers = normalizeFlyers(c);
       const isMax = flyers.some(f => isMaxCategoryFlyer(f));
@@ -3799,6 +3796,15 @@
           singleCounts[p] = 0;
         }
         singleCounts[p]++;
+
+        if (c.pack) {
+          if (!packPaperStats[p]) {
+            packPaperStats[p] = { total: 0, max: 0, none: 0 };
+          }
+          packPaperStats[p].total++;
+          if (isMax) packPaperStats[p].max++;
+          if (isNone) packPaperStats[p].none++;
+        }
       });
 
       if (papers.length >= 2) {
@@ -3860,7 +3866,7 @@
       singleGrid.innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:#888;padding:4px 0;">登録データがありません</div>`;
     }
 
-    // 下段：チラシ・併読・パックの内訳（MAX赤数字はこちらのみに表示）
+    // 下段：チラシ・併読・銘柄別パックの内訳（MAX赤数字はこちらのみに表示）
     const specialWrap = document.getElementById('summarySpecialWrap');
     const specialList = document.getElementById('summarySpecialList');
     specialList.innerHTML = '';
@@ -3910,25 +3916,27 @@
       specialList.appendChild(div);
     });
 
-    // パック必要部数のカウントバッジ
-    if (packTotalCopies > 0) {
+    // パック必要部数を「銘柄ごと」に表示（MAX/なしの赤青内訳付き）
+    const orderedPackKeys = [...new Set([...masterPapers, ...Object.keys(packPaperStats)])];
+    orderedPackKeys.forEach(paperName => {
+      const pStat = packPaperStats[paperName];
+      if (!pStat || pStat.total === 0) return;
       visibleSpecialCount++;
-      const isPackFiltered = activeFilter && activeFilter.type === 'pack';
+
+      const isPackFiltered = activeFilter && activeFilter.type === 'pack' && activeFilter.value === paperName;
+      const subHtml = buildSubCountHtml(pStat.max, pStat.none);
       const packDiv = document.createElement('div');
       packDiv.className = 'summary-item pill-item pack-summary-item' + (isPackFiltered ? ' filter-active' : '');
       packDiv.onclick = () => {
         if (isLoadingMode) return;
-        toggleFilter('pack', 'true');
+        toggleFilter('pack', paperName);
       };
-      const householdSub = packHouseholds !== packTotalCopies
-        ? `<span style="font-size:11px;font-weight:normal;">(${packHouseholds}軒)</span>`
-        : '';
       packDiv.innerHTML = `
-        <span class="summary-label">📦 パック</span>
-        <span class="summary-count">${packTotalCopies}<span style="font-size:11px;font-weight:normal;">部</span>${householdSub}</span>
+        <span class="summary-label">📦 パック ${escapeHtml(paperName)}</span>
+        <span class="summary-count">${pStat.total}<span style="font-size:11px;font-weight:normal;">部</span>${subHtml}</span>
       `;
       specialList.appendChild(packDiv);
-    }
+    });
 
     if (anyPausedCount > 0) {
       visibleSpecialCount++;
@@ -4160,7 +4168,7 @@
         const label = activeFilter.value === 'MAX' ? 'チラシMAX' : activeFilter.value;
         document.getElementById('filterBannerText').textContent = `絞り込み：${label}`;
       } else if (activeFilter.type === 'pack') {
-        document.getElementById('filterBannerText').textContent = `絞り込み：📦 常時パック対象`;
+        document.getElementById('filterBannerText').textContent = `絞り込み：📦 パック「${activeFilter.value}」`;
       } else if (activeFilter.type === 'paused') {
         document.getElementById('filterBannerText').textContent = `絞り込み：現在休刊中`;
       } else {
@@ -4182,7 +4190,7 @@
         } else if (activeFilter.type === 'flyer') {
           return flyers.includes(activeFilter.value);
         } else if (activeFilter.type === 'pack') {
-          return Boolean(c.pack);
+          return Boolean(c.pack) && papers.includes(activeFilter.value);
         }
         return true;
       });
