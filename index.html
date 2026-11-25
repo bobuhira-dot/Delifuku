@@ -191,6 +191,21 @@
     flex-wrap: wrap;
     gap: 5px;
   }
+  .rain-mode-btn {
+    background: #fff;
+    color: #1971c2;
+    border: 1.5px solid #339af0;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .rain-mode-btn.active {
+    background: #1971c2;
+    border-color: #1971c2;
+    color: #fff;
+  }
   .multi-area-btn {
     background: #fff;
     color: var(--danger);
@@ -318,6 +333,14 @@
   .summary-item.pack-summary-item .summary-label,
   .summary-item.pack-summary-item .summary-count {
     color: #087f5b;
+  }
+  .summary-item.rain-pack-hint-item {
+    background: #e7f5ff;
+    border-color: #74c0fc;
+  }
+  .summary-item.rain-pack-hint-item .summary-label,
+  .summary-item.rain-pack-hint-item .summary-count {
+    color: #1971c2;
   }
   .summary-item.flyer-pill-red {
     background: #fff5f5;
@@ -725,6 +748,16 @@
     background: #e6fcf5;
     color: #087f5b;
     border: 1px solid #38d9a9;
+  }
+  .pack-tag.rain-standby {
+    background: #f1f3f5;
+    color: #495057;
+    border: 1px dashed #adb5bd;
+  }
+  .pack-tag.rain-active {
+    background: #e7f5ff;
+    color: #1864ab;
+    border: 1px solid #339af0;
   }
 
   /* チラシ専用バッジ */
@@ -1248,11 +1281,15 @@
     box-shadow: 0 2px 4px rgba(95,61,196,0.3);
   }
 
-  /* パック（ビニール包装）選択ボタン */
-  .pack-toggle-btn {
-    width: 100%;
-    padding: 11px 12px;
-    font-size: 14px;
+  /* パック3択ボタングループ */
+  .pack-mode-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .pack-mode-btn {
+    padding: 10px 4px;
+    font-size: 12px;
     font-weight: bold;
     border: 2px solid #ced4da;
     border-radius: 8px;
@@ -1263,7 +1300,18 @@
     user-select: none;
     transition: all 0.12s;
   }
-  .pack-toggle-btn.selected {
+  .pack-mode-btn.selected-none {
+    background: #495057;
+    border-color: #495057;
+    color: #ffffff;
+  }
+  .pack-mode-btn.selected-rain {
+    background: #1971c2;
+    border-color: #1971c2;
+    color: #ffffff;
+    box-shadow: 0 2px 5px rgba(25, 113, 194, 0.3);
+  }
+  .pack-mode-btn.selected-always {
     background: #099268;
     border-color: #099268;
     color: #ffffff;
@@ -1689,6 +1737,7 @@
       <span id="summaryAreaName">1区 購読集計</span>
       <div class="summary-title-right">
         <span id="summaryTotalCopies">配達: 0軒 / 0部</span>
+        <button type="button" id="rainModeBtn" class="rain-mode-btn" onclick="toggleRainMode()">🌧️ 雨の日</button>
         <button type="button" id="multiAreaBtn" class="multi-area-btn" onclick="toggleMultiAreaMode()">複数合算</button>
         <button type="button" id="loadingModeBtn" class="loading-mode-btn" onclick="toggleLoadingMode()">積込モード</button>
       </div>
@@ -1836,9 +1885,13 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">パック包装（天気に関わらず毎回ビニールに包む家）</label>
-        <button type="button" id="packToggleBtn" class="pack-toggle-btn" onclick="togglePackTemp()">📦 常時パック：なし（通常）</button>
-        <div class="form-hint">※ONにすると併読も1つのパックとして自動カウントされ、カードに「📦パック」が表示されます</div>
+        <label class="form-label">パック包装（ビニール袋入れ）</label>
+        <div class="pack-mode-grid">
+          <button type="button" id="packBtnNone" class="pack-mode-btn" onclick="setPackModeTemp('none')">なし（通常）</button>
+          <button type="button" id="packBtnRain" class="pack-mode-btn" onclick="setPackModeTemp('rain')">🌧️ 雨の日のみ</button>
+          <button type="button" id="packBtnAlways" class="pack-mode-btn" onclick="setPackModeTemp('always')">📦 常時パック</button>
+        </div>
+        <div class="form-hint">※「雨の日のみ」は集計欄の「🌧️ 雨の日」ボタンON時に合算カウントされます（併読は1袋にまとめ）</div>
       </div>
 
       <div class="form-group" id="flyerFormGroup">
@@ -2044,10 +2097,11 @@
   let expandedCustomerId = null;
   let selectedPapersTemp = [];
   let selectedFlyersTemp = [];
-  let selectedPackTemp = false;
+  let selectedPackModeTemp = 'none'; // 'none' | 'rain' | 'always'
   let kyukanPapersTemp = [];
   let activeFilter = null;
   let isLoadingMode = false;
+  let isRainMode = false;
   let isViewingStopped = false;
   let isMultiAreaMode = false;
   let multiSelectedAreas = [];
@@ -2060,6 +2114,26 @@
   let reportMonth = new Date().getMonth() + 1;
   let reportScope = 'current';
   let reportFilter = 'all';
+
+  function normalizePackMode(c) {
+    if (c.packMode === 'always' || c.packMode === 'rain' || c.packMode === 'none') {
+      return c.packMode;
+    }
+    return c.pack ? 'always' : 'none';
+  }
+
+  function isPackActiveToday(c) {
+    const mode = normalizePackMode(c);
+    if (mode === 'always') return true;
+    if (mode === 'rain' && isRainMode) return true;
+    return false;
+  }
+
+  function getPackModeLabel(mode) {
+    if (mode === 'always') return '常時パック';
+    if (mode === 'rain') return '雨の日のみ';
+    return 'なし';
+  }
 
   function getPaperTypes() {
     if (!Array.isArray(appData.paperTypes)) {
@@ -2491,7 +2565,8 @@
           appData.customers.forEach(c => {
             c.papers = normalizePapers(c);
             c.flyers = normalizeFlyers(c);
-            c.pack = Boolean(c.pack);
+            c.packMode = normalizePackMode(c);
+            c.pack = (c.packMode === 'always');
             if (!c.lastName && c.name) {
               const split = splitFullName(c.name);
               c.lastName = split.lastName;
@@ -3354,6 +3429,24 @@
     renderAll();
   }
 
+  // 雨の日モードのON/OFF
+  function toggleRainMode() {
+    isRainMode = !isRainMode;
+    const btn = document.getElementById('rainModeBtn');
+    if (isRainMode) {
+      btn.classList.add('active');
+      btn.textContent = '🌧️ 雨の日ON';
+    } else {
+      btn.classList.remove('active');
+      btn.textContent = '🌧️ 雨の日';
+      if (activeFilter && activeFilter.type === 'rain_standby') {
+        activeFilter = null;
+      }
+    }
+    renderSummary();
+    renderCustomers();
+  }
+
   // 複数区域合算モードのON/OFF
   function toggleMultiAreaMode() {
     isMultiAreaMode = !isMultiAreaMode;
@@ -3777,6 +3870,7 @@
 
     const comboStats = {};
     const packBundleStats = {};
+    let rainOnlyStandbyCount = 0;
     let totalCopies = 0;
 
     deliveringCustomers.forEach(c => {
@@ -3807,8 +3901,13 @@
         if (isNone) comboStats[comboKey].none++;
       }
 
-      // パックは併読なら1つにまとめてカウント（例: 「読売」単体 or 「読売＋三条」セット）
-      if (c.pack) {
+      const pMode = normalizePackMode(c);
+      if (pMode === 'rain' && !isRainMode) {
+        rainOnlyStandbyCount++;
+      }
+
+      // 本日パック対象（常時パック ＋ 雨の日モードON時の雨パック）を単体・併読セットごとに集計
+      if (isPackActiveToday(c)) {
         const bundleKey = papers.join('＋');
         if (!packBundleStats[bundleKey]) {
           packBundleStats[bundleKey] = { total: 0, max: 0, none: 0 };
@@ -3925,6 +4024,7 @@
 
       const isPackFiltered = activeFilter && activeFilter.type === 'pack' && activeFilter.value === bundleKey;
       const subHtml = buildSubCountHtml(pStat.max, pStat.none);
+      const packPrefix = isRainMode ? '🌧️ パック' : '📦 パック';
       const packDiv = document.createElement('div');
       packDiv.className = 'summary-item pill-item pack-summary-item' + (isPackFiltered ? ' filter-active' : '');
       packDiv.onclick = () => {
@@ -3932,11 +4032,26 @@
         toggleFilter('pack', bundleKey);
       };
       packDiv.innerHTML = `
-        <span class="summary-label">📦 パック ${escapeHtml(bundleKey)}</span>
+        <span class="summary-label">${packPrefix} ${escapeHtml(bundleKey)}</span>
         <span class="summary-count">${pStat.total}<span style="font-size:11px;font-weight:normal;">部</span>${subHtml}</span>
       `;
       specialList.appendChild(packDiv);
     });
+
+    // 晴れの日モードで「雨の日のみパック」登録客がいる場合は目安バッジを表示（タップで雨の日モードON）
+    if (!isRainMode && rainOnlyStandbyCount > 0) {
+      visibleSpecialCount++;
+      const rainHintDiv = document.createElement('div');
+      rainHintDiv.className = 'summary-item pill-item rain-pack-hint-item';
+      rainHintDiv.onclick = () => {
+        toggleRainMode();
+      };
+      rainHintDiv.innerHTML = `
+        <span class="summary-label">🌧️ 雨パック登録</span>
+        <span class="summary-count">${rainOnlyStandbyCount}<span style="font-size:11px;font-weight:normal;">軒</span></span>
+      `;
+      specialList.appendChild(rainHintDiv);
+    }
 
     if (anyPausedCount > 0) {
       visibleSpecialCount++;
@@ -4069,7 +4184,10 @@
     if (!keyword) return true;
     const papersStr = normalizePapers(c).join(' ').toLowerCase();
     const flyersStr = normalizeFlyers(c).join(' ').toLowerCase();
-    const packStr = c.pack ? 'パック ビニール 袋' : '';
+    const pMode = normalizePackMode(c);
+    const packStr = pMode === 'always'
+      ? 'パック 常時パック ビニール 袋'
+      : (pMode === 'rain' ? 'パック 雨パック 雨の日 ビニール 袋' : '');
     const historyStr = Array.isArray(c.history)
       ? c.history.map(h => h.text || '').join(' ').toLowerCase()
       : '';
@@ -4190,7 +4308,7 @@
         } else if (activeFilter.type === 'flyer') {
           return flyers.includes(activeFilter.value);
         } else if (activeFilter.type === 'pack') {
-          return Boolean(c.pack) && papers.join('＋') === activeFilter.value;
+          return isPackActiveToday(c) && papers.join('＋') === activeFilter.value;
         }
         return true;
       });
@@ -4251,9 +4369,15 @@
           }).join('')
         : `<span style="font-size:12px;color:#999;">新聞未選択</span>`;
 
-      const packTagHtml = c.pack
-        ? `<span class="pack-tag">📦 パック</span>`
-        : '';
+      const pMode = normalizePackMode(c);
+      let packTagHtml = '';
+      if (pMode === 'always') {
+        packTagHtml = `<span class="pack-tag">📦 パック</span>`;
+      } else if (pMode === 'rain') {
+        packTagHtml = isRainMode
+          ? `<span class="pack-tag rain-active">🌧️ 雨パック</span>`
+          : `<span class="pack-tag rain-standby">🌧️ 雨パック</span>`;
+      }
 
       const flyerTagsHtml = flyers.map(f => {
         const label = f === 'MAX' ? 'チラシMAX' : f;
@@ -4570,21 +4694,20 @@
     });
   }
 
-  function togglePackTemp() {
-    selectedPackTemp = !selectedPackTemp;
-    renderPackButton();
+  function setPackModeTemp(mode) {
+    selectedPackModeTemp = mode;
+    renderPackButtons();
   }
 
-  function renderPackButton() {
-    const btn = document.getElementById('packToggleBtn');
-    if (!btn) return;
-    if (selectedPackTemp) {
-      btn.classList.add('selected');
-      btn.textContent = '✓ 📦 常時パック：あり（毎回ビニール包装）';
-    } else {
-      btn.classList.remove('selected');
-      btn.textContent = '📦 常時パック：なし（通常）';
-    }
+  function renderPackButtons() {
+    const btnNone = document.getElementById('packBtnNone');
+    const btnRain = document.getElementById('packBtnRain');
+    const btnAlways = document.getElementById('packBtnAlways');
+    if (!btnNone || !btnRain || !btnAlways) return;
+
+    btnNone.className = 'pack-mode-btn' + (selectedPackModeTemp === 'none' ? ' selected-none' : '');
+    btnRain.className = 'pack-mode-btn' + (selectedPackModeTemp === 'rain' ? ' selected-rain' : '');
+    btnAlways.className = 'pack-mode-btn' + (selectedPackModeTemp === 'always' ? ' selected-always' : '');
   }
 
   function updatePaperSelectionUI() {
@@ -4754,7 +4877,7 @@
       document.getElementById('inputPhone').value = target.phone;
       selectedPapersTemp = target.stopped ? [] : [...normalizePapers(target)];
       selectedFlyersTemp = [...normalizeFlyers(target)];
-      selectedPackTemp = Boolean(target.pack);
+      selectedPackModeTemp = normalizePackMode(target);
       document.getElementById('inputMemo').value = target.memo;
 
       saveNextBtn.style.display = 'none';
@@ -4778,7 +4901,7 @@
       document.getElementById('inputPhone').value = '';
       selectedPapersTemp = defaultPaper ? [defaultPaper] : [];
       selectedFlyersTemp = [];
-      selectedPackTemp = false;
+      selectedPackModeTemp = 'none';
       document.getElementById('inputMemo').value = '';
 
       saveNextBtn.style.display = 'inline-block';
@@ -4787,7 +4910,7 @@
     renderTownButtons();
     renderBuildingButtons();
     renderPaperButtons();
-    renderPackButton();
+    renderPackButtons();
     renderFlyerButtons();
 
     const modalOverlay = document.getElementById('customerModal');
@@ -4841,8 +4964,10 @@
       pushCustomerHistory(newCust, `チラシ: ${oldLabel} → ${newLabel}`, 'change');
     }
 
-    if (Boolean(oldCust.pack) !== Boolean(newCust.pack)) {
-      pushCustomerHistory(newCust, newCust.pack ? '常時パック: ありに変更' : '常時パック: なしに変更', 'change');
+    const oldPackMode = normalizePackMode(oldCust);
+    const newPackMode = normalizePackMode(newCust);
+    if (oldPackMode !== newPackMode) {
+      pushCustomerHistory(newCust, `パック: ${getPackModeLabel(oldPackMode)} → ${getPackModeLabel(newPackMode)}`, 'change');
     }
   }
 
@@ -4930,7 +5055,8 @@
       phone: document.getElementById('inputPhone').value.trim(),
       papers: papersToStore,
       flyers: orderedFlyers,
-      pack: Boolean(selectedPackTemp),
+      packMode: selectedPackModeTemp,
+      pack: (selectedPackModeTemp === 'always'),
       copies: autoCopies,
       memo: document.getElementById('inputMemo').value.trim(),
       paused: isPaused,
@@ -4947,7 +5073,7 @@
       const idx = appData.customers.findIndex(c => c.id === id);
       if (idx !== -1) appData.customers[idx] = customerObj;
     } else {
-      const packSuffix = customerObj.pack ? ' / パックあり' : '';
+      const packSuffix = customerObj.packMode !== 'none' ? ` / パック:${getPackModeLabel(customerObj.packMode)}` : '';
       pushCustomerHistory(
         customerObj,
         `新規登録: ${orderedPapers.join('＋')}${packSuffix}`,
@@ -5023,7 +5149,8 @@
         appData.customers.forEach(c => {
           c.papers = normalizePapers(c);
           c.flyers = normalizeFlyers(c);
-          c.pack = Boolean(c.pack);
+          c.packMode = normalizePackMode(c);
+          c.pack = (c.packMode === 'always');
           if (!c.lastName && c.name) {
             const split = splitFullName(c.name);
             c.lastName = split.lastName;
@@ -5084,7 +5211,8 @@
       appData.customers.forEach(c => {
         c.papers = normalizePapers(c);
         c.flyers = normalizeFlyers(c);
-        c.pack = Boolean(c.pack);
+        c.packMode = normalizePackMode(c);
+        c.pack = (c.packMode === 'always');
         if (!c.lastName && c.name) {
           const split = splitFullName(c.name);
           c.lastName = split.lastName;
