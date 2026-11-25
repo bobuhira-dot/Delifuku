@@ -1384,6 +1384,99 @@
     box-shadow: 0 2px 4px rgba(95,61,196,0.3);
   }
 
+
+  /* 曜日選択ピル（設定画面・顧客編集画面共通） */
+  .weekday-picker-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 5px;
+  }
+  .weekday-picker-label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #555;
+    margin-right: 2px;
+  }
+  .weekday-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid #adb5bd;
+    background: #ffffff;
+    color: #495057;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+  .weekday-btn.is-sun {
+    color: #c92a2a;
+    border-color: #ffa8a8;
+  }
+  .weekday-btn.is-sat {
+    color: #1864ab;
+    border-color: #74c0fc;
+  }
+  .weekday-btn.active {
+    background: #495057;
+    border-color: #495057;
+    color: #ffffff;
+  }
+  .weekday-btn.is-sun.active {
+    background: #c92a2a;
+    border-color: #c92a2a;
+    color: #ffffff;
+  }
+  .weekday-btn.is-sat.active {
+    background: #1864ab;
+    border-color: #1864ab;
+    color: #ffffff;
+  }
+  .settings-paper-block {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 7px 8px;
+  }
+  .settings-paper-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .today-weekday-pill {
+    display: inline-block;
+    background: #fff;
+    border: 1px solid #f5c2c7;
+    color: #333;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+  }
+  .today-weekday-pill.is-sun {
+    color: #c92a2a;
+    border-color: #ffa8a8;
+    background: #fff5f5;
+  }
+  .today-weekday-pill.is-sat {
+    color: #1864ab;
+    border-color: #74c0fc;
+    background: #e7f5ff;
+  }
+  .weekly-pause-note {
+    font-size: 11px;
+    color: #666;
+    margin-top: 3px;
+  }
+
   /* 選択中新聞の部数（1部・2部〜）調整欄 */
   .paper-copies-list {
     margin-top: 8px;
@@ -1879,7 +1972,7 @@
   <!-- 中部：赤枠の購読数・チラシ・パック集計エリア -->
   <div class="summary-box">
     <div class="summary-title">
-      <span id="summaryAreaName">1区 購読集計</span>
+      <span><span id="summaryAreaName">1区 購読集計</span><span id="todayWeekdayBadge" class="today-weekday-pill"></span></span>
       <div class="summary-title-right">
         <span id="summaryTotalCopies">配達: 0軒 / 0部</span>
         <button type="button" id="rainModeBtn" class="rain-mode-btn" onclick="toggleRainMode()">☔ 雨の日</button>
@@ -2164,7 +2257,7 @@
           <button type="button" class="settings-add-btn" onclick="addPaperType()">＋追加</button>
         </div>
         <div class="settings-item-list" id="settingsPaperList"></div>
-        <div class="form-hint">※色丸タップでバッジ色変更／名前変更すると登録済みの顧客データも自動で書き換わります</div>
+        <div class="form-hint">※色丸タップで色変更／下の曜日ボタンで銘柄ごとの定例休刊日（例: 土・日）を設定できます</div>
       </div>
 
       <!-- 2. チラシ区分の管理 -->
@@ -2246,6 +2339,7 @@
     currentArea: '1区',
     paperTypes: [],
     paperColors: {},
+    paperClosedDays: {},
     flyerTypes: [],
     flyerStyles: {},
     areaTowns: {},
@@ -2256,6 +2350,7 @@
   let expandedCustomerId = null;
   let selectedPapersTemp = [];
   let selectedPaperCountsTemp = {}; // { '読売': 2, '三条': 1 }
+  let selectedWeeklyPausedTemp = {}; // { '読売': [0], '三条': [] } (0=日..6=土)
   let selectedFlyersTemp = [];
   let selectedPackTemp = false;
   let kyukanPapersTemp = [];
@@ -2294,6 +2389,45 @@
     window.location.replace(baseUrl + '?v=' + Date.now());
   }
 
+  const WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+
+  function getTodayWeekdayIndex() {
+    return new Date().getDay(); // 0:日, 1:月, ..., 6:土
+  }
+
+  function getTodayDateWithWeekdayLabel() {
+    const now = new Date();
+    const m = now.getMonth() + 1;
+    const d = now.getDate();
+    const w = WEEKDAY_NAMES[now.getDay()];
+    return `${m}/${d}(${w})`;
+  }
+
+  function getPaperClosedDays(paperName) {
+    if (!appData.paperClosedDays || typeof appData.paperClosedDays !== 'object') {
+      appData.paperClosedDays = {};
+    }
+    const arr = appData.paperClosedDays[paperName];
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  function formatWeekdayListShort(dayIndices) {
+    if (!Array.isArray(dayIndices) || dayIndices.length === 0) return '';
+    const sorted = [...new Set(dayIndices)].sort((a, b) => a - b);
+    return sorted.map(d => WEEKDAY_NAMES[d] || '').filter(Boolean).join('・');
+  }
+
+  function normalizeWeeklyPausedPapers(c, papers) {
+    const result = {};
+    const src = (c && c.weeklyPausedPapers && typeof c.weeklyPausedPapers === 'object') ? c.weeklyPausedPapers : {};
+    papers.forEach(p => {
+      if (Array.isArray(src[p]) && src[p].length > 0) {
+        result[p] = [...new Set(src[p].map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n >= 0 && n <= 6))].sort((a, b) => a - b);
+      }
+    });
+    return result;
+  }
+
   function isAlwaysPackCustomer(c) {
     return Boolean(c.pack) || c.packMode === 'always';
   }
@@ -2308,6 +2442,9 @@
   function getPaperColor(paperName) {
     if (!appData.paperColors || typeof appData.paperColors !== 'object') {
       appData.paperColors = {};
+    }
+    if (!appData.paperClosedDays || typeof appData.paperClosedDays !== 'object') {
+      appData.paperClosedDays = {};
     }
     if (appData.paperColors[paperName]) {
       return appData.paperColors[paperName];
@@ -2475,71 +2612,120 @@
   }
 
   function getPauseStatus(c) {
-    if (c.stopped || !c.paused) {
+    const allPapers = normalizePapers(c);
+    if (c.stopped) {
       return {
         isPausedNow: false,
         isFullPausedNow: false,
         isPartialPausedNow: false,
         isScheduled: false,
         pausedPapersNow: [],
-        activePapersNow: normalizePapers(c),
+        activePapersNow: allPapers,
         label: ''
       };
     }
+
     const today = getTodayStr();
-    const start = (c.pauseStart || '').trim();
-    const end = (c.pauseEnd || '').trim();
-    const allPapers = normalizePapers(c);
-    const rawTargetPapers = Array.isArray(c.pausedPapers) && c.pausedPapers.length > 0
-      ? allPapers.filter(p => c.pausedPapers.includes(p))
-      : allPapers;
-    const targetPapers = rawTargetPapers.length > 0 ? rawTargetPapers : allPapers;
-    const isPartial = targetPapers.length > 0 && targetPapers.length < allPapers.length;
-    const targetPrefix = isPartial ? `${targetPapers.join('・')} ` : '';
+    const todayDow = getTodayWeekdayIndex();
+    const todayDowName = WEEKDAY_NAMES[todayDow];
 
-    let periodText = '';
-    if (start && end) {
-      periodText = ` (${formatShortDate(start)}〜${formatShortDate(end)})`;
-    } else if (start) {
-      periodText = ` (${formatShortDate(start)}〜)`;
-    } else if (end) {
-      periodText = ` (〜${formatShortDate(end)})`;
+    // 1. 銘柄全体の定例休刊日 & 顧客個別の毎週休み曜日による今日の休刊銘柄を抽出
+    const autoClosedPapers = [];
+    const customWeeklyPapers = [];
+    allPapers.forEach(p => {
+      const globalClosed = getPaperClosedDays(p).includes(todayDow);
+      const custWeekly = c.weeklyPausedPapers && Array.isArray(c.weeklyPausedPapers[p]) && c.weeklyPausedPapers[p].includes(todayDow);
+      if (globalClosed) {
+        autoClosedPapers.push(p);
+      } else if (custWeekly) {
+        customWeeklyPapers.push(p);
+      }
+    });
+
+    // 2. 手動の休刊設定（期間指定・無期限）の判定
+    let manualPausedPapers = [];
+    let isScheduled = false;
+    let manualLabel = '';
+    let autoResumed = false;
+
+    if (c.paused) {
+      const start = (c.pauseStart || '').trim();
+      const end = (c.pauseEnd || '').trim();
+      const rawTargetPapers = Array.isArray(c.pausedPapers) && c.pausedPapers.length > 0
+        ? allPapers.filter(p => c.pausedPapers.includes(p))
+        : allPapers;
+      const targetPapers = rawTargetPapers.length > 0 ? rawTargetPapers : allPapers;
+      const isManualPartial = targetPapers.length > 0 && targetPapers.length < allPapers.length;
+      const targetPrefix = isManualPartial ? `${targetPapers.join('・')} ` : '';
+
+      let periodText = '';
+      if (start && end) {
+        periodText = ` (${formatShortDate(start)}〜${formatShortDate(end)})`;
+      } else if (start) {
+        periodText = ` (${formatShortDate(start)}〜)`;
+      } else if (end) {
+        periodText = ` (〜${formatShortDate(end)})`;
+      }
+
+      if (end && today > end) {
+        autoResumed = true;
+      } else if (start && today < start) {
+        isScheduled = true;
+        manualLabel = `${targetPrefix}休刊予定${periodText}`;
+      } else {
+        manualPausedPapers = targetPapers;
+        manualLabel = `${targetPrefix}休刊中${periodText}`;
+      }
     }
 
-    if (end && today > end) {
+    // 3. 手動休刊 ＋ 銘柄定例休刊 ＋ 顧客別曜日休みを合算
+    const combinedPausedSet = new Set([
+      ...manualPausedPapers,
+      ...autoClosedPapers,
+      ...customWeeklyPapers
+    ]);
+    const pausedPapersNow = allPapers.filter(p => combinedPausedSet.has(p));
+    const activePapersNow = allPapers.filter(p => !combinedPausedSet.has(p));
+
+    if (pausedPapersNow.length === 0) {
       return {
         isPausedNow: false,
         isFullPausedNow: false,
         isPartialPausedNow: false,
-        isScheduled: false,
+        isScheduled: isScheduled,
         pausedPapersNow: [],
         activePapersNow: allPapers,
-        label: '',
-        autoResumed: true
+        label: manualLabel,
+        autoResumed: autoResumed
       };
     }
 
-    if (start && today < start) {
-      return {
-        isPausedNow: false,
-        isFullPausedNow: false,
-        isPartialPausedNow: false,
-        isScheduled: true,
-        pausedPapersNow: [],
-        activePapersNow: allPapers,
-        label: `${targetPrefix}休刊予定${periodText}`
-      };
+    const isFullPausedNow = allPapers.length > 0 && activePapersNow.length === 0;
+    const isPartialPausedNow = !isFullPausedNow;
+
+    // ラベル組み立て
+    const labelParts = [];
+    if (manualLabel) {
+      labelParts.push(manualLabel);
+    }
+    const onlyGlobal = autoClosedPapers.filter(p => !manualPausedPapers.includes(p));
+    if (onlyGlobal.length > 0) {
+      labelParts.push(`${onlyGlobal.join('・')} ${todayDowName}曜休刊`);
+    }
+    const onlyWeekly = customWeeklyPapers.filter(p => !manualPausedPapers.includes(p));
+    if (onlyWeekly.length > 0) {
+      labelParts.push(`${onlyWeekly.join('・')} 毎週${todayDowName}休`);
     }
 
-    const activePapersNow = allPapers.filter(p => !targetPapers.includes(p));
     return {
       isPausedNow: true,
-      isFullPausedNow: !isPartial,
-      isPartialPausedNow: isPartial,
-      isScheduled: false,
-      pausedPapersNow: targetPapers,
+      isFullPausedNow: isFullPausedNow,
+      isPartialPausedNow: isPartialPausedNow,
+      isScheduled: isScheduled,
+      pausedPapersNow: pausedPapersNow,
       activePapersNow: activePapersNow,
-      label: `${targetPrefix}休刊中${periodText}`
+      label: labelParts.join(' / '),
+      autoResumed: autoResumed
     };
   }
 
@@ -2716,6 +2902,9 @@
     if (!appData.paperColors || typeof appData.paperColors !== 'object') {
       appData.paperColors = {};
     }
+    if (!appData.paperClosedDays || typeof appData.paperClosedDays !== 'object') {
+      appData.paperClosedDays = {};
+    }
     if (!Array.isArray(appData.flyerTypes)) {
       appData.flyerTypes = [];
     }
@@ -2760,6 +2949,7 @@
           appData.customers.forEach(c => {
             c.papers = normalizePapers(c);
             c.paperCounts = normalizePaperCounts(c, c.papers);
+            c.weeklyPausedPapers = normalizeWeeklyPausedPapers(c, c.papers);
             c.flyers = normalizeFlyers(c);
             c.pack = isAlwaysPackCustomer(c);
             if (!c.lastName && c.name) {
@@ -3217,19 +3407,32 @@
         const color = getPaperColor(paper);
         const usageCount = appData.customers.filter(c => normalizePapers(c).includes(paper)).length;
 
+        const closedDays = getPaperClosedDays(paper);
+        const dayBtnsHtml = WEEKDAY_NAMES.map((wName, dIdx) => {
+          const isClosed = closedDays.includes(dIdx);
+          const sunSatClass = dIdx === 0 ? ' is-sun' : (dIdx === 6 ? ' is-sat' : '');
+          return `<button type="button" class="weekday-btn${sunSatClass}${isClosed ? ' active' : ''}" onclick="togglePaperClosedDay('${escapeHtml(paper)}', ${dIdx})">${wName}</button>`;
+        }).join('');
+
         const row = document.createElement('div');
-        row.className = 'settings-item-row';
+        row.className = 'settings-paper-block';
         row.innerHTML = `
-          <div class="settings-item-left">
-            <span class="settings-color-dot" style="background:${escapeHtml(color)};" title="タップで色変更" onclick="cyclePaperColor(${idx})"></span>
-            <span class="settings-item-name">${escapeHtml(paper)}</span>
-            <span class="settings-item-sub">(${usageCount}軒)</span>
+          <div class="settings-paper-top">
+            <div class="settings-item-left">
+              <span class="settings-color-dot" style="background:${escapeHtml(color)};" title="タップで色変更" onclick="cyclePaperColor(${idx})"></span>
+              <span class="settings-item-name">${escapeHtml(paper)}</span>
+              <span class="settings-item-sub">(${usageCount}軒)</span>
+            </div>
+            <div class="settings-item-actions">
+              <button type="button" class="settings-mini-btn" onclick="movePaperType(${idx}, -1)">▲</button>
+              <button type="button" class="settings-mini-btn" onclick="movePaperType(${idx}, 1)">▼</button>
+              <button type="button" class="settings-mini-btn" onclick="renamePaperType(${idx})">名前</button>
+              <button type="button" class="settings-mini-btn del" onclick="deletePaperType(${idx})">削除</button>
+            </div>
           </div>
-          <div class="settings-item-actions">
-            <button type="button" class="settings-mini-btn" onclick="movePaperType(${idx}, -1)">▲</button>
-            <button type="button" class="settings-mini-btn" onclick="movePaperType(${idx}, 1)">▼</button>
-            <button type="button" class="settings-mini-btn" onclick="renamePaperType(${idx})">名前</button>
-            <button type="button" class="settings-mini-btn del" onclick="deletePaperType(${idx})">削除</button>
+          <div class="weekday-picker-row">
+            <span class="weekday-picker-label">定例休刊:</span>
+            ${dayBtnsHtml}
           </div>
         `;
         paperListEl.appendChild(row);
@@ -3318,6 +3521,21 @@
     renderAll();
   }
 
+  function togglePaperClosedDay(paperName, dayIdx) {
+    if (!appData.paperClosedDays || typeof appData.paperClosedDays !== 'object') {
+      appData.paperClosedDays = {};
+    }
+    const cur = getPaperClosedDays(paperName);
+    if (cur.includes(dayIdx)) {
+      appData.paperClosedDays[paperName] = cur.filter(d => d !== dayIdx);
+    } else {
+      appData.paperClosedDays[paperName] = [...cur, dayIdx].sort((a, b) => a - b);
+    }
+    saveData();
+    renderSettingsLists();
+    renderAll();
+  }
+
   function cyclePaperColor(idx) {
     const papers = getPaperTypes();
     const target = papers[idx];
@@ -3363,6 +3581,10 @@
       appData.paperColors[trimmed] = appData.paperColors[oldName];
       delete appData.paperColors[oldName];
     }
+    if (appData.paperClosedDays && appData.paperClosedDays[oldName]) {
+      appData.paperClosedDays[trimmed] = appData.paperClosedDays[oldName];
+      delete appData.paperClosedDays[oldName];
+    }
 
     appData.customers.forEach(c => {
       if (Array.isArray(c.papers)) {
@@ -3371,6 +3593,10 @@
       if (c.paperCounts && typeof c.paperCounts === 'object' && c.paperCounts[oldName] !== undefined) {
         c.paperCounts[trimmed] = c.paperCounts[oldName];
         delete c.paperCounts[oldName];
+      }
+      if (c.weeklyPausedPapers && typeof c.weeklyPausedPapers === 'object' && c.weeklyPausedPapers[oldName] !== undefined) {
+        c.weeklyPausedPapers[trimmed] = c.weeklyPausedPapers[oldName];
+        delete c.weeklyPausedPapers[oldName];
       }
       if (Array.isArray(c.pausedPapers)) {
         c.pausedPapers = c.pausedPapers.map(p => (p === oldName ? trimmed : p));
@@ -3400,6 +3626,9 @@
 
     appData.paperTypes = papers.filter((_, i) => i !== idx);
     delete appData.paperColors[target];
+    if (appData.paperClosedDays) {
+      delete appData.paperClosedDays[target];
+    }
 
     appData.customers.forEach(c => {
       if (Array.isArray(c.papers)) {
@@ -3407,6 +3636,9 @@
       }
       if (c.paperCounts && typeof c.paperCounts === 'object') {
         delete c.paperCounts[target];
+      }
+      if (c.weeklyPausedPapers && typeof c.weeklyPausedPapers === 'object') {
+        delete c.weeklyPausedPapers[target];
       }
       if (Array.isArray(c.pausedPapers)) {
         c.pausedPapers = c.pausedPapers.filter(p => p !== target);
@@ -4226,6 +4458,12 @@
       ? `${targetAreas.join('＋')} 合算集計`
       : `${appData.currentArea} 購読集計`;
     document.getElementById('summaryAreaName').textContent = areaTitleLabel;
+    const weekdayBadge = document.getElementById('todayWeekdayBadge');
+    if (weekdayBadge) {
+      const dow = getTodayWeekdayIndex();
+      weekdayBadge.textContent = getTodayDateWithWeekdayLabel();
+      weekdayBadge.className = 'today-weekday-pill' + (dow === 0 ? ' is-sun' : (dow === 6 ? ' is-sat' : ''));
+    }
 
     const pausedText = anyPausedCount > 0 ? ` (休刊${anyPausedCount}軒)` : '';
     document.getElementById('summaryTotalCopies').textContent = `配達: ${deliveringCustomers.length}軒 / ${totalCopies}部${pausedText}`;
@@ -4820,6 +5058,15 @@
           <span class="copies-badge${isMultiCopies ? ' multi-copies' : ''}">${copiesLabel}</span>
         </div>
         <div class="paper-badges-wrap">${paperTagsHtml}${packTagHtml}${flyerTagsHtml}</div>
+        ${(() => {
+          if (c.stopped || !c.weeklyPausedPapers) return '';
+          const parts = papers
+            .filter(p => Array.isArray(c.weeklyPausedPapers[p]) && c.weeklyPausedPapers[p].length > 0)
+            .map(p => `${p}(毎週${formatWeekdayListShort(c.weeklyPausedPapers[p])}休)`);
+          return parts.length > 0
+            ? `<div style="font-size:11px;color:#5c6773;font-weight:bold;margin-top:2px;">📅 曜日休設定: ${escapeHtml(parts.join(' / '))}</div>`
+            : '';
+        })()}
         <div class="card-address-preview">${addressHtml}</div>
         ${c.memo ? `<div class="memo-preview">📝 ${escapeHtml(c.memo)}</div>` : ''}
 
@@ -5086,6 +5333,19 @@
     renderPaperButtons();
   }
 
+  function toggleWeeklyPausedTemp(paper, dayIdx) {
+    if (!selectedWeeklyPausedTemp || typeof selectedWeeklyPausedTemp !== 'object') {
+      selectedWeeklyPausedTemp = {};
+    }
+    const cur = Array.isArray(selectedWeeklyPausedTemp[paper]) ? selectedWeeklyPausedTemp[paper] : [];
+    if (cur.includes(dayIdx)) {
+      selectedWeeklyPausedTemp[paper] = cur.filter(d => d !== dayIdx);
+    } else {
+      selectedWeeklyPausedTemp[paper] = [...cur, dayIdx].sort((a, b) => a - b);
+    }
+    renderPaperButtons();
+  }
+
   function renderPaperCopiesList() {
     const listWrap = document.getElementById('paperCopiesList');
     if (!listWrap) return;
@@ -5098,15 +5358,42 @@
 
     orderedSelected.forEach(paper => {
       const cnt = parseInt(selectedPaperCountsTemp[paper], 10) || 1;
+      const custWeeklyDays = (selectedWeeklyPausedTemp && Array.isArray(selectedWeeklyPausedTemp[paper]))
+        ? selectedWeeklyPausedTemp[paper]
+        : [];
+      const globalClosedDays = getPaperClosedDays(paper);
+
+      const dayBtnsHtml = WEEKDAY_NAMES.map((wName, dIdx) => {
+        const isCustOff = custWeeklyDays.includes(dIdx);
+        const isGlobalOff = globalClosedDays.includes(dIdx);
+        const sunSatClass = dIdx === 0 ? ' is-sun' : (dIdx === 6 ? ' is-sat' : '');
+        const titleAttr = isGlobalOff ? ` title="${paper}は銘柄全体で${wName}曜休刊設定済"` : '';
+        const globalStyle = (isGlobalOff && !isCustOff) ? ' style="opacity:0.45;"' : '';
+        return `<button type="button" class="weekday-btn${sunSatClass}${isCustOff ? ' active' : ''}"${titleAttr}${globalStyle} onclick="toggleWeeklyPausedTemp('${escapeHtml(paper)}', ${dIdx})">${wName}</button>`;
+      }).join('');
+
+      const globalNoteHtml = globalClosedDays.length > 0
+        ? `<div class="weekly-pause-note">※${escapeHtml(paper)}は設定で毎週「${escapeHtml(formatWeekdayListShort(globalClosedDays))}」休刊です</div>`
+        : '';
+
       const row = document.createElement('div');
       row.className = 'paper-copy-row';
+      row.style.flexDirection = 'column';
+      row.style.alignItems = 'stretch';
       row.innerHTML = `
-        <span class="paper-copy-name">${escapeHtml(paper)} の部数</span>
-        <div class="paper-copy-controls">
-          <button type="button" class="copy-step-btn" onclick="changePaperCopyTemp('${escapeHtml(paper)}', -1)">−</button>
-          <span class="copy-count-val${cnt > 1 ? ' is-multi' : ''}">${cnt}部</span>
-          <button type="button" class="copy-step-btn" onclick="changePaperCopyTemp('${escapeHtml(paper)}', 1)">＋</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="paper-copy-name">${escapeHtml(paper)} の部数</span>
+          <div class="paper-copy-controls">
+            <button type="button" class="copy-step-btn" onclick="changePaperCopyTemp('${escapeHtml(paper)}', -1)">−</button>
+            <span class="copy-count-val${cnt > 1 ? ' is-multi' : ''}">${cnt}部</span>
+            <button type="button" class="copy-step-btn" onclick="changePaperCopyTemp('${escapeHtml(paper)}', 1)">＋</button>
+          </div>
         </div>
+        <div class="weekday-picker-row" style="margin-top:6px;padding-top:6px;border-top:1px dashed #cbd5e1;">
+          <span class="weekday-picker-label">この家の休み曜日:</span>
+          ${dayBtnsHtml}
+        </div>
+        ${globalNoteHtml}
       `;
       listWrap.appendChild(row);
     });
@@ -5141,6 +5428,7 @@
         if (selectedPapersTemp.includes(paper)) {
           selectedPapersTemp = selectedPapersTemp.filter(p => p !== paper);
           delete selectedPaperCountsTemp[paper];
+          delete selectedWeeklyPausedTemp[paper];
         } else {
           selectedPapersTemp.push(paper);
           selectedPaperCountsTemp[paper] = 1;
@@ -5257,6 +5545,7 @@
       document.getElementById('inputPhone').value = target.phone;
       selectedPapersTemp = target.stopped ? [] : [...normalizePapers(target)];
       selectedPaperCountsTemp = target.stopped ? {} : normalizePaperCounts(target, selectedPapersTemp);
+      selectedWeeklyPausedTemp = target.stopped ? {} : normalizeWeeklyPausedPapers(target, selectedPapersTemp);
       selectedFlyersTemp = [...normalizeFlyers(target)];
       selectedPackTemp = isAlwaysPackCustomer(target);
       document.getElementById('inputMemo').value = target.memo;
@@ -5282,6 +5571,7 @@
       document.getElementById('inputPhone').value = '';
       selectedPapersTemp = defaultPaper ? [defaultPaper] : [];
       selectedPaperCountsTemp = defaultPaper ? { [defaultPaper]: 1 } : {};
+      selectedWeeklyPausedTemp = {};
       selectedFlyersTemp = [];
       selectedPackTemp = false;
       document.getElementById('inputMemo').value = '';
@@ -5419,12 +5709,19 @@
       : orderedPapers;
 
     const countsToStore = {};
+    const weeklyPausedToStore = {};
     papersToStore.forEach(p => {
       if (willBeStopped && existingCustomer) {
         countsToStore[p] = getPaperCountForCustomer(existingCustomer, p);
+        if (existingCustomer.weeklyPausedPapers && Array.isArray(existingCustomer.weeklyPausedPapers[p]) && existingCustomer.weeklyPausedPapers[p].length > 0) {
+          weeklyPausedToStore[p] = [...existingCustomer.weeklyPausedPapers[p]];
+        }
       } else {
         const val = parseInt(selectedPaperCountsTemp[p], 10);
         countsToStore[p] = (!isNaN(val) && val >= 1) ? val : 1;
+        if (selectedWeeklyPausedTemp && Array.isArray(selectedWeeklyPausedTemp[p]) && selectedWeeklyPausedTemp[p].length > 0) {
+          weeklyPausedToStore[p] = [...selectedWeeklyPausedTemp[p]].sort((a, b) => a - b);
+        }
       }
     });
 
@@ -5456,6 +5753,7 @@
       phone: document.getElementById('inputPhone').value.trim(),
       papers: papersToStore,
       paperCounts: countsToStore,
+      weeklyPausedPapers: weeklyPausedToStore,
       flyers: orderedFlyers,
       pack: Boolean(selectedPackTemp),
       copies: autoCopies,
@@ -5551,6 +5849,7 @@
         appData.customers.forEach(c => {
           c.papers = normalizePapers(c);
           c.paperCounts = normalizePaperCounts(c, c.papers);
+            c.weeklyPausedPapers = normalizeWeeklyPausedPapers(c, c.papers);
           c.flyers = normalizeFlyers(c);
           c.pack = isAlwaysPackCustomer(c);
           if (!c.lastName && c.name) {
@@ -5613,6 +5912,7 @@
       appData.customers.forEach(c => {
         c.papers = normalizePapers(c);
         c.paperCounts = normalizePaperCounts(c, c.papers);
+            c.weeklyPausedPapers = normalizeWeeklyPausedPapers(c, c.papers);
         c.flyers = normalizeFlyers(c);
         c.pack = isAlwaysPackCustomer(c);
         if (!c.lastName && c.name) {
