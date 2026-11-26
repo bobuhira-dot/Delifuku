@@ -33,7 +33,38 @@
     padding-bottom: 100px;
   }
 
-  /* 右下固定の丸型「＋」顧客追加ボタン */
+  /* 右下固定の丸型「＋」顧客追加ボタン＆その上の「🔍」顧客検索ボタン */
+  .fab-search-btn {
+    position: fixed;
+    right: 18px;
+    bottom: 92px;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: #ffffff;
+    color: var(--primary);
+    border: 2.5px solid var(--primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 150;
+    transition: transform 0.12s, background-color 0.15s;
+    user-select: none;
+  }
+  .fab-search-btn:active {
+    transform: scale(0.92);
+    background: #eef4ff;
+  }
+  .fab-search-btn.has-query {
+    background: #1971c2;
+    color: #ffffff;
+    border-color: #1971c2;
+  }
   .fab-add-btn {
     position: fixed;
     right: 18px;
@@ -60,7 +91,8 @@
     transform: scale(0.92);
     background: #1557b0;
   }
-  body.loading-mode-active .fab-add-btn {
+  body.loading-mode-active .fab-add-btn,
+  body.loading-mode-active .fab-search-btn {
     display: none !important;
   }
 
@@ -673,6 +705,43 @@
     display: flex;
     gap: 8px;
   }
+  .search-input-wrap {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+  .search-input-wrap .search-input {
+    width: 100%;
+    padding-right: 34px;
+  }
+  .search-clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: #dee2e6;
+    color: #495057;
+    font-size: 13px;
+    font-weight: bold;
+    line-height: 1;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .search-clear-btn.visible {
+    display: inline-flex;
+  }
+  .search-clear-btn:active {
+    background: #ced4da;
+  }
+
   .search-input {
     flex: 1;
     padding: 10px 12px;
@@ -1681,6 +1750,43 @@
     color: #ffffff;
   }
 
+
+  .today-alert-header {
+    cursor: pointer;
+    user-select: none;
+  }
+  .today-alert-box.is-collapsed .today-alert-header {
+    margin-bottom: 0;
+  }
+  .today-alert-box.is-collapsed .today-alert-list {
+    display: none;
+  }
+  .today-collapse-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #ffffff;
+    border: 1px solid #f08c00;
+    color: #8f5700;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  #customerModal .modal-content {
+    padding-bottom: 0;
+  }
+  #customerModal .modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: #ffffff;
+    margin: 14px -18px 0 -18px;
+    padding: 12px 18px 16px 18px;
+    border-top: 1px solid #e9ecef;
+    box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.06);
+    z-index: 20;
+  }
+
   /* 休刊設定用ミニモーダル */
   .paused-date-grid {
     display: grid;
@@ -1766,6 +1872,43 @@
     background: #5c6773;
     border-color: #5c6773;
     color: #ffffff;
+  }
+
+
+  .today-alert-header {
+    cursor: pointer;
+    user-select: none;
+  }
+  .today-alert-box.is-collapsed .today-alert-header {
+    margin-bottom: 0;
+  }
+  .today-alert-box.is-collapsed .today-alert-list {
+    display: none;
+  }
+  .today-collapse-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #ffffff;
+    border: 1px solid #f08c00;
+    color: #8f5700;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  #customerModal .modal-content {
+    padding-bottom: 0;
+  }
+  #customerModal .modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: #ffffff;
+    margin: 14px -18px 0 -18px;
+    padding: 12px 18px 16px 18px;
+    border-top: 1px solid #e9ecef;
+    box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.06);
+    z-index: 20;
   }
 
   /* 休刊設定用ミニモーダル */
@@ -2163,7 +2306,10 @@
 
   <!-- 検索＆新規追加 -->
   <div class="control-bar">
-    <input type="text" id="searchInput" class="search-input" placeholder="名前・町名・建物・銘柄・パック・メモで検索..." oninput="renderCustomers()">
+    <div class="search-input-wrap">
+      <input type="text" id="searchInput" class="search-input" placeholder="名前・町名・建物・銘柄・パック・メモで検索..." oninput="renderCustomers()">
+      <button type="button" id="searchClearBtn" class="search-clear-btn" title="検索をクリア" aria-label="検索をクリア" onclick="clearCustomerSearch()">×</button>
+    </div>
     <button type="button" class="add-customer-btn" onclick="openCustomerModal()">＋ 顧客追加</button>
   </div>
 
@@ -2185,7 +2331,8 @@
     </div>
   </div>
 
-  <!-- 右下常時追従の丸型「＋」顧客追加ボタン -->
+  <!-- 右下常時追従の丸型「🔍」顧客検索ボタン＆「＋」顧客追加ボタン -->
+  <button type="button" id="fabSearchBtn" class="fab-search-btn" title="顧客を検索" aria-label="顧客を検索" onclick="focusCustomerSearch()">🔍</button>
   <button type="button" class="fab-add-btn" title="顧客を追加" aria-label="顧客を追加" onclick="openCustomerModal()">＋</button>
 
   <!-- 顧客追加・編集モーダル -->
@@ -2253,11 +2400,6 @@
           </div>
         </div>
         <div class="form-hint">※建物名を入れると次回から上の紫ボタンでワンタップ選択できます</div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">電話番号</label>
-        <input type="tel" id="inputPhone" class="form-control" placeholder="例: 090-1234-5678">
       </div>
 
       <div class="form-group">
@@ -2522,6 +2664,7 @@
   let activeFilter = null;
   let isLoadingMode = false;
   let isRainMode = false;
+  let isTodayAlertCollapsed = false;
   let dayOffset = 0; // 0: 今日, 1: 明日
   let isViewingStopped = false;
   let isMultiAreaMode = false;
@@ -4398,6 +4541,11 @@
     });
   }
 
+  function toggleTodayAlertCollapse() {
+    isTodayAlertCollapsed = !isTodayAlertCollapsed;
+    renderTodayAlerts();
+  }
+
   function renderTodayAlerts() {
     const box = document.getElementById('todayAlertBox');
     const todayStr = getTodayStr();
@@ -4472,10 +4620,16 @@
     }
 
     box.style.display = 'block';
+    if (isTodayAlertCollapsed) {
+      box.classList.add('is-collapsed');
+    } else {
+      box.classList.remove('is-collapsed');
+    }
+    const collapseLabel = isTodayAlertCollapsed ? '開く ▼' : 'たたむ ▲';
     box.innerHTML = `
-      <div class="today-alert-header">
+      <div class="today-alert-header" onclick="toggleTodayAlertCollapse()">
         <span>⚠️ 本日（${escapeHtml(todayShort)}）の入り・止め・休刊確認（${alerts.length}件）</span>
-        <span style="font-size:11px;font-weight:normal;">タップで該当客へ</span>
+        <span class="today-collapse-badge">${collapseLabel}</span>
       </div>
       <div class="today-alert-list" id="todayAlertList"></div>
     `;
@@ -5235,7 +5389,6 @@
       (c.address && c.address.toLowerCase().includes(keyword)) ||
       (c.building && c.building.toLowerCase().includes(keyword)) ||
       (c.room && c.room.toLowerCase().includes(keyword)) ||
-      (c.phone && c.phone.includes(keyword)) ||
       (c.memo && c.memo.toLowerCase().includes(keyword)) ||
       papersStr.includes(keyword) ||
       flyersStr.includes(keyword) ||
@@ -5307,10 +5460,44 @@
     });
   }
 
+  function clearCustomerSearch() {
+    const searchEl = document.getElementById('searchInput');
+    if (searchEl) {
+      searchEl.value = '';
+      searchEl.focus({ preventScroll: true });
+    }
+    renderCustomers();
+  }
+
+  function focusCustomerSearch() {
+    if (isLoadingMode) {
+      toggleLoadingMode();
+    }
+    const searchEl = document.getElementById('searchInput');
+    if (!searchEl) return;
+    if (searchEl.scrollIntoView) {
+      searchEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    searchEl.focus({ preventScroll: true });
+    if (searchEl.value) {
+      searchEl.select();
+    }
+  }
+
   function renderCustomers() {
     const listEl = document.getElementById('customerList');
     const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
     const bannerEl = document.getElementById('filterBanner');
+    const fabSearchBtn = document.getElementById('fabSearchBtn');
+    if (fabSearchBtn) {
+      if (keyword) fabSearchBtn.classList.add('has-query');
+      else fabSearchBtn.classList.remove('has-query');
+    }
+    const searchClearBtn = document.getElementById('searchClearBtn');
+    if (searchClearBtn) {
+      if (document.getElementById('searchInput').value.length > 0) searchClearBtn.classList.add('visible');
+      else searchClearBtn.classList.remove('visible');
+    }
 
     renderCrossSearchBanner(keyword);
 
@@ -5444,10 +5631,6 @@
         statusBadgeHtml = `<span class="paused-scheduled-badge">${escapeHtml(pauseInfo.label)}</span>`;
       }
 
-      const phoneHtml = c.phone
-        ? `<a href="tel:${escapeHtml(c.phone)}" onclick="event.stopPropagation()" style="color:#1a73e8;text-decoration:none;font-weight:bold;">📞 ${escapeHtml(c.phone)}</a>`
-        : '<span style="color:#888;">電話番号未登録</span>';
-
       const baseAddr = (c.address || '').trim();
       const bldgName = (c.building || '').trim();
       const roomNum = (c.room || '').trim();
@@ -5541,7 +5724,6 @@
         ${c.memo ? `<div class="memo-preview">📝 ${escapeHtml(c.memo)}</div>` : ''}
 
         <div class="card-details" onclick="event.stopPropagation()">
-          <div class="detail-row">${phoneHtml}</div>
           ${mapButtonsHtml}
           <div class="card-actions">
             ${leftActionsHtml}
@@ -6016,7 +6198,6 @@
       document.getElementById('inputBuilding').value = target.building || '';
       document.getElementById('inputRoom').value = target.room || '';
 
-      document.getElementById('inputPhone').value = target.phone;
       selectedPapersTemp = target.stopped ? [] : [...normalizePapers(target)];
       selectedPaperCountsTemp = target.stopped ? {} : normalizePaperCounts(target, selectedPapersTemp);
       selectedWeeklyPausedTemp = target.stopped ? {} : normalizeWeeklyPausedPapers(target, selectedPapersTemp);
@@ -6048,7 +6229,6 @@
       document.getElementById('inputBanchi').value = '';
       document.getElementById('inputBuilding').value = prevBuilding;
       document.getElementById('inputRoom').value = '';
-      document.getElementById('inputPhone').value = '';
       selectedPapersTemp = [];
       selectedPaperCountsTemp = {};
       selectedWeeklyPausedTemp = {};
@@ -6263,7 +6443,7 @@
       address: combinedAddress,
       building: buildingVal,
       room: roomVal,
-      phone: document.getElementById('inputPhone').value.trim(),
+      phone: existingCustomer ? (existingCustomer.phone || '') : '',
       papers: papersToStore,
       paperCounts: countsToStore,
       weeklyPausedPapers: weeklyPausedToStore,
