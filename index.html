@@ -1257,6 +1257,40 @@
     background: #fff;
   }
 
+
+  .name-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .name-header-row .form-label {
+    margin-bottom: 0;
+  }
+  .corp-mode-toggle-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 14px;
+    border: 1.5px solid #5f3dc4;
+    background: #f3f0ff;
+    color: #5f3dc4;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .corp-mode-toggle-btn.active {
+    background: #5f3dc4;
+    border-color: #5f3dc4;
+    color: #ffffff;
+  }
+  .corp-split-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 8px;
+  }
+
   /* 苗字・名前の2列グリッド */
   .name-split-row {
     display: grid;
@@ -2355,18 +2389,36 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">顧客名（苗字と名前） *</label>
-        <div class="name-split-row">
-          <div>
-            <div class="address-sub-label">苗字 *</div>
-            <input type="text" id="inputLastName" class="form-control" placeholder="例: 山田" enterkeyhint="next" oninput="handleLastNameInput()" onkeydown="handleLastNameKeydown(event)">
-          </div>
-          <div>
-            <div class="address-sub-label">名前（空欄OK）</div>
-            <input type="text" id="inputFirstName" class="form-control" placeholder="例: 太郎" enterkeyhint="next" oninput="handleFirstNameInput()" onkeydown="handleFirstNameKeydown(event)">
-          </div>
+        <div class="name-header-row">
+          <label class="form-label" id="customerNameLabel">顧客名（苗字と名前） *</label>
+          <button type="button" id="corpModeBtn" class="corp-mode-toggle-btn" onclick="toggleCorpMode()">🏢 法人モード</button>
         </div>
-        <div class="form-hint">※苗字を入力して「次へ」を押すか少し待つと自動で名前欄に移動します</div>
+        <div id="individualNameFields">
+          <div class="name-split-row">
+            <div>
+              <div class="address-sub-label">苗字 *</div>
+              <input type="text" id="inputLastName" class="form-control" placeholder="例: 山田" enterkeyhint="next" oninput="handleLastNameInput()" onkeydown="handleLastNameKeydown(event)">
+            </div>
+            <div>
+              <div class="address-sub-label">名前（空欄OK）</div>
+              <input type="text" id="inputFirstName" class="form-control" placeholder="例: 太郎" enterkeyhint="next" oninput="handleFirstNameInput()" onkeydown="handleFirstNameKeydown(event)">
+            </div>
+          </div>
+          <div class="form-hint">※苗字を入力して「次へ」を押すか少し待つと自動で名前欄に移動します</div>
+        </div>
+        <div id="corpNameFields" style="display:none;">
+          <div class="corp-split-row">
+            <div>
+              <div class="address-sub-label">会社名・店舗名 *</div>
+              <input type="text" id="inputCompanyName" class="form-control" placeholder="例: 〇〇工業 / 〇〇食堂" oninput="checkStoppedCustomerMatches()">
+            </div>
+            <div>
+              <div class="address-sub-label">担当者・屋号（任意）</div>
+              <input type="text" id="inputContactName" class="form-control" placeholder="例: 佐藤 / 本店" oninput="checkStoppedCustomerMatches()">
+            </div>
+          </div>
+          <div class="form-hint">※「保存して次を追加」で次へ進むと自動で個人モードに戻ります</div>
+        </div>
         <div id="stoppedMatchBox" class="stopped-match-box" style="display:none;"></div>
       </div>
 
@@ -2665,6 +2717,7 @@
   let isLoadingMode = false;
   let isRainMode = false;
   let isTodayAlertCollapsed = false;
+  let isCorpMode = false;
   let dayOffset = 0; // 0: 今日, 1: 明日
   let isViewingStopped = false;
   let isMultiAreaMode = false;
@@ -3292,6 +3345,7 @@
     if (!appData.areaTowns || !Array.isArray(appData.areaTowns[area])) return;
     appData.areaTowns[area] = appData.areaTowns[area].filter(t => t !== townToRemove);
     saveData();
+    renderCorpModeUI();
     renderTownButtons();
   }
 
@@ -5756,8 +5810,10 @@
       return;
     }
 
-    const lastNorm = normalizeCompareStr(document.getElementById('inputLastName').value);
-    const firstNorm = normalizeCompareStr(document.getElementById('inputFirstName').value);
+    const rawLast = isCorpMode ? document.getElementById('inputCompanyName').value : document.getElementById('inputLastName').value;
+    const rawFirst = isCorpMode ? document.getElementById('inputContactName').value : document.getElementById('inputFirstName').value;
+    const lastNorm = normalizeCompareStr(rawLast);
+    const firstNorm = normalizeCompareStr(rawFirst);
     const nameNorm = lastNorm + firstNorm;
     const townNorm = normalizeCompareStr(document.getElementById('inputTown').value);
     const banchiNorm = normalizeCompareStr(document.getElementById('inputBanchi').value);
@@ -5853,7 +5909,8 @@
         const townInput = document.getElementById('inputTown');
         const banchiInput = document.getElementById('inputBanchi');
         townInput.value = town;
-        renderTownButtons();
+        renderCorpModeUI();
+    renderTownButtons();
         checkStoppedCustomerMatches();
         banchiInput.focus();
       };
@@ -6154,6 +6211,63 @@
     }, 2800);
   }
 
+  function renderCorpModeUI() {
+    const btn = document.getElementById('corpModeBtn');
+    const label = document.getElementById('customerNameLabel');
+    const indFields = document.getElementById('individualNameFields');
+    const corpFields = document.getElementById('corpNameFields');
+    if (!btn || !label || !indFields || !corpFields) return;
+
+    if (isCorpMode) {
+      btn.classList.add('active');
+      btn.textContent = '✓ 法人モード中';
+      label.textContent = '会社・店舗名 *';
+      indFields.style.display = 'none';
+      corpFields.style.display = 'block';
+    } else {
+      btn.classList.remove('active');
+      btn.textContent = '🏢 法人モード';
+      label.textContent = '顧客名（苗字と名前） *';
+      indFields.style.display = 'block';
+      corpFields.style.display = 'none';
+    }
+  }
+
+  function toggleCorpMode() {
+    if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
+    if (firstNameAutoMoveTimer) clearTimeout(firstNameAutoMoveTimer);
+
+    if (!isCorpMode) {
+      const lastVal = (document.getElementById('inputLastName').value || '').trim();
+      const firstVal = (document.getElementById('inputFirstName').value || '').trim();
+      const combined = buildFullName(lastVal, firstVal);
+      const companyInput = document.getElementById('inputCompanyName');
+      if (combined && companyInput && !companyInput.value.trim()) {
+        companyInput.value = combined;
+      }
+      isCorpMode = true;
+      renderCorpModeUI();
+      checkStoppedCustomerMatches();
+      if (companyInput) {
+        companyInput.focus({ preventScroll: true });
+      }
+    } else {
+      const companyVal = (document.getElementById('inputCompanyName').value || '').trim();
+      const contactVal = (document.getElementById('inputContactName').value || '').trim();
+      const lastInput = document.getElementById('inputLastName');
+      const firstInput = document.getElementById('inputFirstName');
+      if (companyVal && lastInput && !lastInput.value.trim()) {
+        lastInput.value = companyVal;
+      }
+      if (contactVal && firstInput && !firstInput.value.trim()) {
+        firstInput.value = contactVal;
+      }
+      isCorpMode = false;
+      renderCorpModeUI();
+      checkStoppedCustomerMatches();
+    }
+  }
+
   function openCustomerModal(id = null, keepPreviousPlace = false, previousArea = null) {
     if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
 
@@ -6189,8 +6303,11 @@
       const splitName = target.lastName !== undefined
         ? { lastName: target.lastName, firstName: target.firstName || '' }
         : splitFullName(target.name);
+      isCorpMode = Boolean(target.isCorp);
       document.getElementById('inputLastName').value = splitName.lastName;
       document.getElementById('inputFirstName').value = splitName.firstName;
+      document.getElementById('inputCompanyName').value = isCorpMode ? (target.lastName || target.name || '') : '';
+      document.getElementById('inputContactName').value = isCorpMode ? (target.firstName || '') : '';
 
       const { town, banchi } = splitTownAndBanchi(target.address);
       document.getElementById('inputTown').value = town;
@@ -6223,8 +6340,11 @@
       const areaCustomers = appData.customers.filter(c => c.area === targetArea && !c.stopped);
       const maxOrder = areaCustomers.reduce((max, c) => Math.max(max, Number(c.order) || 0), 0);
       document.getElementById('inputOrder').value = maxOrder + 1;
+      isCorpMode = false;
       document.getElementById('inputLastName').value = '';
       document.getElementById('inputFirstName').value = '';
+      document.getElementById('inputCompanyName').value = '';
+      document.getElementById('inputContactName').value = '';
       document.getElementById('inputTown').value = prevTown;
       document.getElementById('inputBanchi').value = '';
       document.getElementById('inputBuilding').value = prevBuilding;
@@ -6243,6 +6363,7 @@
       saveNextBtn.style.display = 'inline-block';
     }
 
+    renderCorpModeUI();
     renderTownButtons();
     renderBuildingButtons();
     renderPaperButtons();
@@ -6337,14 +6458,21 @@
   }
 
   function saveCustomer(continueAdding = false) {
-    const lastName = document.getElementById('inputLastName').value.trim();
-    const firstName = document.getElementById('inputFirstName').value.trim();
+    const lastName = isCorpMode
+      ? document.getElementById('inputCompanyName').value.trim()
+      : document.getElementById('inputLastName').value.trim();
+    const firstName = isCorpMode
+      ? document.getElementById('inputContactName').value.trim()
+      : document.getElementById('inputFirstName').value.trim();
     const fullName = buildFullName(lastName, firstName);
 
     if (!lastName) {
-      alert('苗字を入力してください。');
+      alert(isCorpMode ? '会社名・店舗名を入力してください。' : '苗字を入力してください。');
       scrollModalToTop();
-      document.getElementById('inputLastName').focus();
+      const focusTarget = isCorpMode
+        ? document.getElementById('inputCompanyName')
+        : document.getElementById('inputLastName');
+      if (focusTarget) focusTarget.focus();
       return;
     }
 
@@ -6440,6 +6568,7 @@
       lastName: lastName,
       firstName: firstName,
       name: fullName,
+      isCorp: Boolean(isCorpMode),
       address: combinedAddress,
       building: buildingVal,
       room: roomVal,
@@ -6494,6 +6623,7 @@
     renderAll();
 
     if (continueAdding && !existingCustomer) {
+      isCorpMode = false;
       openCustomerModal(null, true, areaVal);
       showContinuousSavedToast(fullName);
       const lastNameEl = document.getElementById('inputLastName');
