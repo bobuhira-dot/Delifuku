@@ -413,6 +413,16 @@
     gap: 5px;
     text-align: center;
   }
+  .summary-grid.cols-1 {
+    grid-template-columns: 1fr;
+  }
+  .summary-grid.cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .summary-grid.cols-2 .summary-item {
+    padding: 8px 6px;
+  }
   .summary-sub-wrap {
     margin-top: 8px;
     padding-top: 8px;
@@ -627,6 +637,9 @@
   body.loading-mode-active .summary-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
+  }
+  body.loading-mode-active .summary-grid.cols-1 {
+    grid-template-columns: 1fr;
   }
   body.loading-mode-active .summary-item {
     padding: 12px 8px;
@@ -1457,6 +1470,15 @@
     padding: 1px 6px;
     border-radius: 10px;
     margin-left: 4px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .today-weekday-pill.is-preview-active {
+    background: #c3fae8;
+    border-color: #0ca678;
+    color: #087f5b;
+    box-shadow: 0 0 0 2px rgba(12, 166, 120, 0.35);
+    text-decoration: underline;
   }
   .today-weekday-pill.is-sun {
     color: #c92a2a;
@@ -1468,6 +1490,76 @@
     border-color: #74c0fc;
     background: #e7f5ff;
   }
+
+
+  .today-fixed-pill {
+    display: inline-block;
+    background: #fff5f5;
+    border: 1.5px solid #e03131;
+    color: #c92a2a;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .tomorrow-date-pill {
+    display: inline-block;
+    background: #c3fae8;
+    border: 1.5px solid #0ca678;
+    color: #087f5b;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+    user-select: none;
+  }
+
+  .tomorrow-preview-btn {
+    display: inline-block;
+    background: #ffffff;
+    border: 1.5px solid #0ca678;
+    color: #087f5b;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-left: 4px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .tomorrow-preview-btn.active {
+    background: #099268;
+    border-color: #099268;
+    color: #ffffff;
+  }
+  .summary-box.is-tomorrow-preview {
+    background: #e6fcf5;
+    border-color: #0ca678;
+  }
+  .summary-box.is-tomorrow-preview .summary-title {
+    color: #087f5b;
+  }
+  .summary-visible-toggle {
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 12px;
+    border: 1.5px solid #1a73e8;
+    background: #e7f5ff;
+    color: #1864ab;
+    cursor: pointer;
+    user-select: none;
+  }
+  .summary-visible-toggle.is-hidden-mode {
+    border-color: #adb5bd;
+    background: #f1f3f5;
+    color: #868e96;
+  }
+
   .weekly-pause-note {
     font-size: 11px;
     color: #666;
@@ -1565,6 +1657,30 @@
     line-height: 1.4;
   }
 
+
+  .modal-kyukan-box {
+    background: #f8f9fa;
+    border: 1.5px solid #ced4da;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .modal-kyukan-toggle-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: bold;
+    border: 2px solid #adb5bd;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #495057;
+    cursor: pointer;
+    user-select: none;
+  }
+  .modal-kyukan-toggle-btn.active {
+    background: #5c6773;
+    border-color: #5c6773;
+    color: #ffffff;
+  }
+
   /* 休刊設定用ミニモーダル */
   .paused-date-grid {
     display: grid;
@@ -1626,6 +1742,30 @@
     color: #777;
     padding: 30px 10px;
     font-size: 14px;
+  }
+
+
+  .modal-kyukan-box {
+    background: #f8f9fa;
+    border: 1.5px solid #ced4da;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .modal-kyukan-toggle-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: bold;
+    border: 2px solid #adb5bd;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #495057;
+    cursor: pointer;
+    user-select: none;
+  }
+  .modal-kyukan-toggle-btn.active {
+    background: #5c6773;
+    border-color: #5c6773;
+    color: #ffffff;
   }
 
   /* 休刊設定用ミニモーダル */
@@ -1969,7 +2109,7 @@
   <!-- 中部：赤枠の購読数・チラシ・パック集計エリア -->
   <div class="summary-box">
     <div class="summary-title">
-      <span><span id="summaryAreaName">1区 購読集計</span><span id="todayWeekdayBadge" class="today-weekday-pill"></span></span>
+      <span><span id="summaryAreaName">1区 購読集計</span><span id="todayWeekdayBadge" class="today-weekday-pill" title="タップで今日に戻す" onclick="resetToTodayPreview()"></span><span id="tomorrowDateBadge" class="tomorrow-date-pill" style="display:none;"></span><button type="button" id="tomorrowPreviewBtn" class="tomorrow-preview-btn" onclick="toggleTomorrowPreview()">明日</button></span>
       <div class="summary-title-right">
         <span id="summaryTotalCopies">配達: 0軒 / 0部</span>
         <button type="button" id="rainModeBtn" class="rain-mode-btn" onclick="toggleRainMode()">☔ 雨の日</button>
@@ -2076,7 +2216,7 @@
           </div>
           <div>
             <div class="address-sub-label">名前（空欄OK）</div>
-            <input type="text" id="inputFirstName" class="form-control" placeholder="例: 太郎" oninput="checkStoppedCustomerMatches()">
+            <input type="text" id="inputFirstName" class="form-control" placeholder="例: 太郎" enterkeyhint="next" oninput="handleFirstNameInput()" onkeydown="handleFirstNameKeydown(event)">
           </div>
         </div>
         <div class="form-hint">※苗字を入力して「次へ」を押すか少し待つと自動で名前欄に移動します</div>
@@ -2132,6 +2272,31 @@
       <div class="form-group">
         <label class="form-label">パック包装（晴れの日でも毎回ビニールに包む家だけ選択）</label>
         <button type="button" id="packSingleBtn" class="pack-single-btn" onclick="togglePackTemp()">📦 常時パック</button>
+      </div>
+
+      <div class="form-group" id="modalKyukanGroup">
+        <label class="form-label">休刊設定（任意）</label>
+        <div class="modal-kyukan-box">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <button type="button" id="modalKyukanBtn" class="modal-kyukan-toggle-btn" onclick="toggleModalKyukanActive()">⏸ 休刊にする</button>
+            <span id="modalKyukanSummaryText" style="font-size:12px;color:#555;font-weight:bold;">通常（休刊なし）</span>
+          </div>
+          <div id="modalKyukanDetailBody" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed #ced4da;">
+            <div style="font-size:12px;font-weight:bold;color:#495057;margin-bottom:4px;">休刊にする新聞（複数選択可）</div>
+            <div class="kyukan-paper-grid" id="modalKyukanPaperGrid" style="margin-bottom:10px;"></div>
+            <div style="font-size:12px;font-weight:bold;color:#495057;margin-bottom:4px;">休刊期間（空欄なら無期限／終了日後に自動再開）</div>
+            <div class="paused-date-grid">
+              <input type="date" id="modalKyukanStart" class="paused-date-input" onchange="updateModalKyukanSummaryText()">
+              <span style="font-size:13px;font-weight:bold;color:#555;">〜</span>
+              <input type="date" id="modalKyukanEnd" class="paused-date-input" onchange="updateModalKyukanSummaryText()">
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+              <button type="button" class="paused-clear-dates-btn" onclick="setModalKyukanPreset(0)">無期限（日付クリア）</button>
+              <button type="button" class="paused-clear-dates-btn" onclick="setModalKyukanPreset(1)">明日から1日</button>
+              <button type="button" class="paused-clear-dates-btn" onclick="setModalKyukanPreset(3)">明日から3日間</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="form-group" id="flyerFormGroup">
@@ -2336,6 +2501,7 @@
     currentArea: '1区',
     paperTypes: [],
     paperColors: {},
+    paperSummaryVisible: {},
     paperClosedDays: {},
     flyerTypes: [],
     flyerStyles: {},
@@ -2351,9 +2517,12 @@
   let selectedFlyersTemp = [];
   let selectedPackTemp = false;
   let kyukanPapersTemp = [];
+  let modalKyukanActiveTemp = false;
+  let modalKyukanPapersTemp = [];
   let activeFilter = null;
   let isLoadingMode = false;
   let isRainMode = false;
+  let dayOffset = 0; // 0: 今日, 1: 明日
   let isViewingStopped = false;
   let isMultiAreaMode = false;
   let multiSelectedAreas = [];
@@ -2392,6 +2561,76 @@
 
   function sortWeekdaysMonToSun(dayIndices) {
     return [...new Set(dayIndices)].sort((a, b) => DISPLAY_WEEKDAY_ORDER.indexOf(a) - DISPLAY_WEEKDAY_ORDER.indexOf(b));
+  }
+
+  function getTargetDateObj() {
+    const now = new Date();
+    now.setDate(now.getDate() + (dayOffset || 0));
+    return now;
+  }
+
+  function getTargetDateStr() {
+    const dObj = getTargetDateObj();
+    const y = dObj.getFullYear();
+    const m = String(dObj.getMonth() + 1).padStart(2, '0');
+    const d = String(dObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function getTargetWeekdayIndex() {
+    return getTargetDateObj().getDay();
+  }
+
+  function getTargetDateWithWeekdayLabel() {
+    const dObj = getTargetDateObj();
+    const m = dObj.getMonth() + 1;
+    const d = dObj.getDate();
+    const w = WEEKDAY_NAMES[dObj.getDay()];
+    return `${m}/${d}(${w})`;
+  }
+
+  function toggleTomorrowPreview() {
+    dayOffset = (dayOffset === 1) ? 0 : 1;
+    renderAll();
+  }
+
+  function resetToTodayPreview() {
+    if (dayOffset !== 0) {
+      dayOffset = 0;
+      renderAll();
+    }
+  }
+
+  // 銘柄ごとの上部集計ボックス表示可否（デフォルトは先頭2つを表示、3つ目以降は非表示）
+  function isPaperSummaryVisible(paperName) {
+    if (!appData.paperSummaryVisible || typeof appData.paperSummaryVisible !== 'object') {
+      appData.paperSummaryVisible = {};
+    }
+    if (typeof appData.paperSummaryVisible[paperName] === 'boolean') {
+      return appData.paperSummaryVisible[paperName];
+    }
+    const idx = getPaperTypes().indexOf(paperName);
+    return idx >= 0 && idx < 2;
+  }
+
+  function syncDefaultPaperSummaryVisibility() {
+    if (!appData.paperSummaryVisible || typeof appData.paperSummaryVisible !== 'object') {
+      appData.paperSummaryVisible = {};
+    }
+    const papers = getPaperTypes();
+    papers.forEach((p, idx) => {
+      if (typeof appData.paperSummaryVisible[p] !== 'boolean') {
+        appData.paperSummaryVisible[p] = (idx < 2);
+      }
+    });
+  }
+
+  function togglePaperSummaryVisible(paperName) {
+    syncDefaultPaperSummaryVisibility();
+    appData.paperSummaryVisible[paperName] = !isPaperSummaryVisible(paperName);
+    saveData();
+    renderSettingsLists();
+    renderAll();
   }
 
   function getTodayWeekdayIndex() {
@@ -2446,6 +2685,10 @@
     if (!appData.paperColors || typeof appData.paperColors !== 'object') {
       appData.paperColors = {};
     }
+    if (!appData.paperSummaryVisible || typeof appData.paperSummaryVisible !== 'object') {
+      appData.paperSummaryVisible = {};
+    }
+    syncDefaultPaperSummaryVisibility();
     if (!appData.paperClosedDays || typeof appData.paperClosedDays !== 'object') {
       appData.paperClosedDays = {};
     }
@@ -2518,17 +2761,76 @@
     return l || f;
   }
 
+  let firstNameAutoMoveTimer = null;
+  let isFirstNameComposing = false;
+
+  function moveToTownOrBanchiIfReady() {
+    const townInput = document.getElementById('inputTown');
+    const banchiInput = document.getElementById('inputBanchi');
+    if (townInput && townInput.value.trim() !== '') {
+      if (banchiInput) banchiInput.focus();
+    } else if (townInput) {
+      townInput.focus();
+    }
+  }
+
+  function handleFirstNameKeydown(e) {
+    if (e.key === 'Enter' && !isFirstNameComposing) {
+      e.preventDefault();
+      if (firstNameAutoMoveTimer) clearTimeout(firstNameAutoMoveTimer);
+      moveToTownOrBanchiIfReady();
+    }
+  }
+
+  function handleFirstNameInput() {
+    checkStoppedCustomerMatches();
+    const townInput = document.getElementById('inputTown');
+    if (!townInput || townInput.value.trim() === '') return;
+    if (!isFirstNameComposing) {
+      scheduleMoveFromFirstName();
+    }
+  }
+
+  function scheduleMoveFromFirstName() {
+    if (firstNameAutoMoveTimer) clearTimeout(firstNameAutoMoveTimer);
+    const firstInput = document.getElementById('inputFirstName');
+    const townInput = document.getElementById('inputTown');
+    const isNew = !document.getElementById('editCustomerId').value;
+    if (!isNew || !firstInput || !townInput) return;
+    if (firstInput.value.trim().length >= 1 && townInput.value.trim() !== '') {
+      firstNameAutoMoveTimer = setTimeout(() => {
+        if (!isFirstNameComposing && document.activeElement === firstInput && firstInput.value.trim().length >= 1 && townInput.value.trim() !== '') {
+          const banchiInput = document.getElementById('inputBanchi');
+          if (banchiInput) banchiInput.focus();
+        }
+      }, 950);
+    }
+  }
+
   function setupNameCompositionListeners() {
     const lastInput = document.getElementById('inputLastName');
-    if (!lastInput) return;
-    lastInput.addEventListener('compositionstart', () => {
-      isLastNameComposing = true;
-      if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
-    });
-    lastInput.addEventListener('compositionend', () => {
-      isLastNameComposing = false;
-      scheduleMoveToFirstName();
-    });
+    if (lastInput) {
+      lastInput.addEventListener('compositionstart', () => {
+        isLastNameComposing = true;
+        if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
+      });
+      lastInput.addEventListener('compositionend', () => {
+        isLastNameComposing = false;
+        scheduleMoveToFirstName();
+      });
+    }
+
+    const firstInput = document.getElementById('inputFirstName');
+    if (firstInput) {
+      firstInput.addEventListener('compositionstart', () => {
+        isFirstNameComposing = true;
+        if (firstNameAutoMoveTimer) clearTimeout(firstNameAutoMoveTimer);
+      });
+      firstInput.addEventListener('compositionend', () => {
+        isFirstNameComposing = false;
+        scheduleMoveFromFirstName();
+      });
+    }
   }
 
   function handleLastNameKeydown(e) {
@@ -2628,8 +2930,8 @@
       };
     }
 
-    const today = getTodayStr();
-    const todayDow = getTodayWeekdayIndex();
+    const today = getTargetDateStr();
+    const todayDow = getTargetWeekdayIndex();
     const todayDowName = WEEKDAY_NAMES[todayDow];
 
     // 1. 銘柄全体の定例休刊日 & 顧客個別の毎週休み曜日による今日の休刊銘柄を抽出
@@ -2905,6 +3207,10 @@
     if (!appData.paperColors || typeof appData.paperColors !== 'object') {
       appData.paperColors = {};
     }
+    if (!appData.paperSummaryVisible || typeof appData.paperSummaryVisible !== 'object') {
+      appData.paperSummaryVisible = {};
+    }
+    syncDefaultPaperSummaryVisibility();
     if (!appData.paperClosedDays || typeof appData.paperClosedDays !== 'object') {
       appData.paperClosedDays = {};
     }
@@ -3428,6 +3734,7 @@
               <span class="settings-item-sub">(${usageCount}軒)</span>
             </div>
             <div class="settings-item-actions">
+              <button type="button" class="summary-visible-toggle${isPaperSummaryVisible(paper) ? '' : ' is-hidden-mode'}" onclick="togglePaperSummaryVisible('${escapeHtml(paper)}')">${isPaperSummaryVisible(paper) ? '集計:表示' : '集計:非表示'}</button>
               <button type="button" class="settings-mini-btn" onclick="movePaperType(${idx}, -1)">▲</button>
               <button type="button" class="settings-mini-btn" onclick="movePaperType(${idx}, 1)">▼</button>
               <button type="button" class="settings-mini-btn" onclick="renamePaperType(${idx})">名前</button>
@@ -3519,6 +3826,10 @@
     papers.push(name);
     const nextColor = PAPER_COLOR_PALETTE[(papers.length - 1) % PAPER_COLOR_PALETTE.length];
     appData.paperColors[name] = nextColor;
+    if (!appData.paperSummaryVisible || typeof appData.paperSummaryVisible !== 'object') {
+      appData.paperSummaryVisible = {};
+    }
+    appData.paperSummaryVisible[name] = (papers.length <= 2);
     input.value = '';
     saveData();
     renderSettingsLists();
@@ -3594,6 +3905,10 @@
       appData.paperColors[trimmed] = appData.paperColors[oldName];
       delete appData.paperColors[oldName];
     }
+    if (appData.paperSummaryVisible && typeof appData.paperSummaryVisible[oldName] === 'boolean') {
+      appData.paperSummaryVisible[trimmed] = appData.paperSummaryVisible[oldName];
+      delete appData.paperSummaryVisible[oldName];
+    }
     if (appData.paperClosedDays && appData.paperClosedDays[oldName]) {
       appData.paperClosedDays[trimmed] = appData.paperClosedDays[oldName];
       delete appData.paperClosedDays[oldName];
@@ -3639,6 +3954,9 @@
 
     appData.paperTypes = papers.filter((_, i) => i !== idx);
     delete appData.paperColors[target];
+    if (appData.paperSummaryVisible) {
+      delete appData.paperSummaryVisible[target];
+    }
     if (appData.paperClosedDays) {
       delete appData.paperClosedDays[target];
     }
@@ -3789,6 +4107,102 @@
   // ========================
   // 休刊設定モーダル（新聞選択＆期間指定）
   // ========================
+  function toggleModalKyukanActive() {
+    modalKyukanActiveTemp = !modalKyukanActiveTemp;
+    if (modalKyukanActiveTemp && modalKyukanPapersTemp.length === 0) {
+      modalKyukanPapersTemp = [...selectedPapersTemp];
+    }
+    renderModalKyukanUI();
+  }
+
+  function toggleModalKyukanPaper(paperName) {
+    if (modalKyukanPapersTemp.includes(paperName)) {
+      if (modalKyukanPapersTemp.length <= 1) return;
+      modalKyukanPapersTemp = modalKyukanPapersTemp.filter(p => p !== paperName);
+    } else {
+      modalKyukanPapersTemp.push(paperName);
+    }
+    renderModalKyukanUI();
+  }
+
+  function setModalKyukanPreset(days) {
+    if (days === 0) {
+      document.getElementById('modalKyukanStart').value = '';
+      document.getElementById('modalKyukanEnd').value = '';
+    } else {
+      document.getElementById('modalKyukanStart').value = getTodayStr(1);
+      document.getElementById('modalKyukanEnd').value = getTodayStr(days);
+    }
+    updateModalKyukanSummaryText();
+  }
+
+  function updateModalKyukanSummaryText() {
+    const textEl = document.getElementById('modalKyukanSummaryText');
+    if (!textEl) return;
+    if (!modalKyukanActiveTemp) {
+      textEl.textContent = '通常（休刊なし）';
+      textEl.style.color = '#555';
+      return;
+    }
+    const start = document.getElementById('modalKyukanStart').value;
+    const end = document.getElementById('modalKyukanEnd').value;
+    let periodLabel = '無期限';
+    if (start && end) periodLabel = `${formatShortDate(start)}〜${formatShortDate(end)}`;
+    else if (start) periodLabel = `${formatShortDate(start)}〜`;
+    else if (end) periodLabel = `〜${formatShortDate(end)}`;
+
+    const allSel = getPaperTypes().filter(p => selectedPapersTemp.includes(p));
+    const targetP = allSel.filter(p => modalKyukanPapersTemp.includes(p));
+    const paperLabel = (targetP.length > 0 && targetP.length < allSel.length)
+      ? targetP.join('・')
+      : '選択紙';
+    textEl.textContent = `${paperLabel}（${periodLabel}）`;
+    textEl.style.color = '#c92a2a';
+  }
+
+  function renderModalKyukanUI() {
+    const group = document.getElementById('modalKyukanGroup');
+    const btn = document.getElementById('modalKyukanBtn');
+    const body = document.getElementById('modalKyukanDetailBody');
+    const grid = document.getElementById('modalKyukanPaperGrid');
+    if (!group || !btn || !body || !grid) return;
+
+    const activeSelectedPapers = getPaperTypes().filter(p => selectedPapersTemp.includes(p));
+    if (activeSelectedPapers.length === 0) {
+      group.style.display = 'none';
+      return;
+    }
+    group.style.display = 'block';
+
+    modalKyukanPapersTemp = modalKyukanPapersTemp.filter(p => activeSelectedPapers.includes(p));
+    if (modalKyukanActiveTemp && modalKyukanPapersTemp.length === 0) {
+      modalKyukanPapersTemp = [...activeSelectedPapers];
+    }
+
+    if (modalKyukanActiveTemp) {
+      btn.classList.add('active');
+      btn.textContent = '✓ 休刊設定中';
+      body.style.display = 'block';
+    } else {
+      btn.classList.remove('active');
+      btn.textContent = '⏸ 休刊にする';
+      body.style.display = 'none';
+    }
+
+    grid.innerHTML = '';
+    activeSelectedPapers.forEach(p => {
+      const pBtn = document.createElement('button');
+      pBtn.type = 'button';
+      const isChecked = modalKyukanPapersTemp.includes(p);
+      pBtn.className = 'kyukan-paper-btn' + (isChecked ? ' selected' : '');
+      pBtn.textContent = (isChecked ? '✓ ' : '') + p;
+      pBtn.onclick = () => toggleModalKyukanPaper(p);
+      grid.appendChild(pBtn);
+    });
+
+    updateModalKyukanSummaryText();
+  }
+
   function openKyukanModal(customerId) {
     const target = appData.customers.find(c => c.id === customerId);
     if (!target) return;
@@ -4467,15 +4881,52 @@
       });
     });
 
+    const daySuffix = dayOffset === 1 ? '（明日）' : '';
     const areaTitleLabel = isMultiAreaMode
-      ? `${targetAreas.join('＋')} 合算集計`
-      : `${appData.currentArea} 購読集計`;
+      ? `${targetAreas.join('＋')} 合算集計${daySuffix}`
+      : `${appData.currentArea} 購読集計${daySuffix}`;
     document.getElementById('summaryAreaName').textContent = areaTitleLabel;
+
+    const summaryBoxEl = document.querySelector('.summary-box');
+    if (summaryBoxEl) {
+      if (dayOffset === 1) summaryBoxEl.classList.add('is-tomorrow-preview');
+      else summaryBoxEl.classList.remove('is-tomorrow-preview');
+    }
+
     const weekdayBadge = document.getElementById('todayWeekdayBadge');
+    const tomorrowDateBadge = document.getElementById('tomorrowDateBadge');
     if (weekdayBadge) {
-      const dow = getTodayWeekdayIndex();
-      weekdayBadge.textContent = getTodayDateWithWeekdayLabel();
-      weekdayBadge.className = 'today-weekday-pill' + (dow === 0 ? ' is-sun' : (dow === 6 ? ' is-sat' : ''));
+      const todayDow = new Date().getDay();
+      const todayNow = new Date();
+      const todayLabel = `${todayNow.getMonth() + 1}/${todayNow.getDate()}(${WEEKDAY_NAMES[todayDow]})`;
+      if (dayOffset === 1) {
+        weekdayBadge.textContent = `今日 ${todayLabel}`;
+        weekdayBadge.className = 'today-fixed-pill';
+      } else {
+        weekdayBadge.textContent = todayLabel;
+        weekdayBadge.className = 'today-weekday-pill'
+          + (todayDow === 0 ? ' is-sun' : (todayDow === 6 ? ' is-sat' : ''));
+      }
+    }
+    if (tomorrowDateBadge) {
+      if (dayOffset === 1) {
+        tomorrowDateBadge.style.display = 'inline-block';
+        tomorrowDateBadge.textContent = `明日 ${getTargetDateWithWeekdayLabel()}`;
+      } else {
+        tomorrowDateBadge.style.display = 'none';
+        tomorrowDateBadge.textContent = '';
+      }
+    }
+
+    const tomorrowBtn = document.getElementById('tomorrowPreviewBtn');
+    if (tomorrowBtn) {
+      if (dayOffset === 1) {
+        tomorrowBtn.classList.add('active');
+        tomorrowBtn.textContent = '今日に戻す';
+      } else {
+        tomorrowBtn.classList.remove('active');
+        tomorrowBtn.textContent = '明日';
+      }
     }
 
     const pausedText = anyPausedCount > 0 ? ` (休刊${anyPausedCount}軒)` : '';
@@ -4495,6 +4946,7 @@
 
     let visibleSingleCount = 0;
     masterPapers.forEach(paper => {
+      if (!isPaperSummaryVisible(paper)) return;
       const cnt = singleCounts[paper] || 0;
       if (cnt === 0) return;
       visibleSingleCount++;
@@ -4518,6 +4970,13 @@
       `;
       singleGrid.appendChild(div);
     });
+
+    singleGrid.classList.remove('cols-1', 'cols-2');
+    if (visibleSingleCount === 1) {
+      singleGrid.classList.add('cols-1');
+    } else if (visibleSingleCount === 2) {
+      singleGrid.classList.add('cols-2');
+    }
 
     if (visibleSingleCount === 0) {
       singleGrid.innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:#888;padding:4px 0;">登録データがありません</div>`;
@@ -5454,6 +5913,7 @@
     });
 
     renderPaperCopiesList();
+    renderModalKyukanUI();
     updatePaperSelectionUI();
   }
 
@@ -5560,6 +6020,12 @@
       selectedPapersTemp = target.stopped ? [] : [...normalizePapers(target)];
       selectedPaperCountsTemp = target.stopped ? {} : normalizePaperCounts(target, selectedPapersTemp);
       selectedWeeklyPausedTemp = target.stopped ? {} : normalizeWeeklyPausedPapers(target, selectedPapersTemp);
+      modalKyukanActiveTemp = Boolean(!target.stopped && target.paused);
+      modalKyukanPapersTemp = modalKyukanActiveTemp
+        ? (Array.isArray(target.pausedPapers) && target.pausedPapers.length > 0 ? [...target.pausedPapers] : [...selectedPapersTemp])
+        : [...selectedPapersTemp];
+      document.getElementById('modalKyukanStart').value = modalKyukanActiveTemp ? (target.pauseStart || '') : '';
+      document.getElementById('modalKyukanEnd').value = modalKyukanActiveTemp ? (target.pauseEnd || '') : '';
       selectedFlyersTemp = [...normalizeFlyers(target)];
       selectedPackTemp = isAlwaysPackCustomer(target);
       document.getElementById('inputMemo').value = target.memo;
@@ -5583,9 +6049,13 @@
       document.getElementById('inputBuilding').value = prevBuilding;
       document.getElementById('inputRoom').value = '';
       document.getElementById('inputPhone').value = '';
-      selectedPapersTemp = defaultPaper ? [defaultPaper] : [];
-      selectedPaperCountsTemp = defaultPaper ? { [defaultPaper]: 1 } : {};
+      selectedPapersTemp = [];
+      selectedPaperCountsTemp = {};
       selectedWeeklyPausedTemp = {};
+      modalKyukanActiveTemp = false;
+      modalKyukanPapersTemp = [];
+      document.getElementById('modalKyukanStart').value = '';
+      document.getElementById('modalKyukanEnd').value = '';
       selectedFlyersTemp = [];
       selectedPackTemp = false;
       document.getElementById('inputMemo').value = '';
@@ -5614,6 +6084,7 @@
 
   function closeCustomerModal() {
     if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
+    if (firstNameAutoMoveTimer) clearTimeout(firstNameAutoMoveTimer);
     scrollModalToTop();
     document.getElementById('continuousToast').style.display = 'none';
     document.getElementById('customerModal').classList.remove('open');
@@ -5668,6 +6139,21 @@
     if (isAlwaysPackCustomer(oldCust) !== isAlwaysPackCustomer(newCust)) {
       pushCustomerHistory(newCust, isAlwaysPackCustomer(newCust) ? '常時パック: ありに変更' : '常時パック: なしに変更', 'change');
     }
+
+    const oldPaused = Boolean(!oldCust.stopped && oldCust.paused);
+    const newPaused = Boolean(!newCust.stopped && newCust.paused);
+    if (!oldPaused && newPaused) {
+      let pLabel = ' (無期限)';
+      if (newCust.pauseStart && newCust.pauseEnd) pLabel = ` (${formatShortDate(newCust.pauseStart)}〜${formatShortDate(newCust.pauseEnd)})`;
+      else if (newCust.pauseStart) pLabel = ` (${formatShortDate(newCust.pauseStart)}〜)`;
+      else if (newCust.pauseEnd) pLabel = ` (〜${formatShortDate(newCust.pauseEnd)})`;
+      const pPrefix = (newCust.pausedPapers && newCust.pausedPapers.length > 0 && newCust.pausedPapers.length < newCust.papers.length)
+        ? `${newCust.pausedPapers.join('・')} `
+        : '全紙 ';
+      pushCustomerHistory(newCust, `休刊設定: ${pPrefix}${pLabel}`, 'out');
+    } else if (oldPaused && !newPaused) {
+      pushCustomerHistory(newCust, '休刊解除（配達再開）', 'in');
+    }
   }
 
   function saveCustomer(continueAdding = false) {
@@ -5686,13 +6172,6 @@
     const existingCustomer = id ? appData.customers.find(c => c.id === id) : null;
     const masterPapers = getPaperTypes();
     const orderedPapers = masterPapers.filter(p => selectedPapersTemp.includes(p));
-
-    if (!existingCustomer && orderedPapers.length === 0) {
-      alert(masterPapers.length === 0
-        ? '先に「⚙ 設定」から新聞銘柄を登録してください。'
-        : '新規追加時は購読新聞を1つ以上選択してください。');
-      return;
-    }
 
     const willBeStopped = (orderedPapers.length === 0);
 
@@ -5757,12 +6236,22 @@
       ? (existingCustomer && existingCustomer.stopped && existingCustomer.stoppedDate ? existingCustomer.stoppedDate : getTodayStr())
       : '';
 
-    const isPaused = willBeStopped ? false : (existingCustomer ? Boolean(existingCustomer.paused) : false);
-    const pauseStart = isPaused && existingCustomer ? (existingCustomer.pauseStart || '') : '';
-    const pauseEnd = isPaused && existingCustomer ? (existingCustomer.pauseEnd || '') : '';
-    const pausedPapers = isPaused && existingCustomer && Array.isArray(existingCustomer.pausedPapers)
-      ? existingCustomer.pausedPapers.filter(p => papersToStore.includes(p))
+    const modalStartVal = document.getElementById('modalKyukanStart').value;
+    const modalEndVal = document.getElementById('modalKyukanEnd').value;
+    if (!willBeStopped && modalKyukanActiveTemp && modalStartVal && modalEndVal && modalStartVal > modalEndVal) {
+      alert('休刊の終了日は開始日以降の日付を指定してください。');
+      return;
+    }
+
+    const isPaused = willBeStopped ? false : Boolean(modalKyukanActiveTemp);
+    const pauseStart = isPaused ? modalStartVal : '';
+    const pauseEnd = isPaused ? modalEndVal : '';
+    const pausedPapers = isPaused
+      ? papersToStore.filter(p => modalKyukanPapersTemp.includes(p))
       : [];
+    if (isPaused && pausedPapers.length === 0) {
+      pausedPapers.push(...papersToStore);
+    }
 
     const customerObj = {
       id: id || 'cust_' + Date.now(),
@@ -5798,11 +6287,19 @@
     } else {
       const packSuffix = customerObj.pack ? ' / 常時パック' : '';
       const formattedPapers = formatPapersWithCounts(orderedPapers, countsToStore);
+      const regText = formattedPapers ? `新規登録: ${formattedPapers}${packSuffix}` : `新規登録（止め客保管）${packSuffix}`;
       pushCustomerHistory(
         customerObj,
-        `新規登録: ${formattedPapers}${packSuffix}`,
+        regText,
         'in'
       );
+      if (customerObj.paused) {
+        let pLabel = ' (無期限)';
+        if (customerObj.pauseStart && customerObj.pauseEnd) pLabel = ` (${formatShortDate(customerObj.pauseStart)}〜${formatShortDate(customerObj.pauseEnd)})`;
+        else if (customerObj.pauseStart) pLabel = ` (${formatShortDate(customerObj.pauseStart)}〜)`;
+        else if (customerObj.pauseEnd) pLabel = ` (〜${formatShortDate(customerObj.pauseEnd)})`;
+        pushCustomerHistory(customerObj, `休刊設定: 全紙${pLabel}`, 'out');
+      }
       appData.customers.push(customerObj);
     }
 
