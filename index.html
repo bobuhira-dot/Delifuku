@@ -1285,10 +1285,8 @@
     border-color: #5f3dc4;
     color: #ffffff;
   }
-  .corp-split-row {
-    display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 8px;
+  .corp-single-wrap {
+    width: 100%;
   }
 
   /* 苗字・名前の2列グリッド */
@@ -2407,17 +2405,11 @@
           <div class="form-hint">※苗字を入力して「次へ」を押すか少し待つと自動で名前欄に移動します</div>
         </div>
         <div id="corpNameFields" style="display:none;">
-          <div class="corp-split-row">
-            <div>
-              <div class="address-sub-label">会社名・店舗名 *</div>
-              <input type="text" id="inputCompanyName" class="form-control" placeholder="例: 〇〇工業 / 〇〇食堂" oninput="checkStoppedCustomerMatches()">
-            </div>
-            <div>
-              <div class="address-sub-label">担当者・屋号（任意）</div>
-              <input type="text" id="inputContactName" class="form-control" placeholder="例: 佐藤 / 本店" oninput="checkStoppedCustomerMatches()">
-            </div>
+          <div class="corp-single-wrap">
+            <div class="address-sub-label">会社名・店舗名 *</div>
+            <input type="text" id="inputCompanyName" class="form-control" placeholder="例: 〇〇工業 / 〇〇食堂" oninput="checkStoppedCustomerMatches()">
           </div>
-          <div class="form-hint">※「保存して次を追加」で次へ進むと自動で個人モードに戻ります</div>
+          <div class="form-hint">※個人名（苗字・名前）はそのまま保持されます。「保存して次を追加」で次へ進むと自動で個人モードに戻ります</div>
         </div>
         <div id="stoppedMatchBox" class="stopped-match-box" style="display:none;"></div>
       </div>
@@ -5439,7 +5431,10 @@
     const historyStr = Array.isArray(c.history)
       ? c.history.map(h => h.text || '').join(' ').toLowerCase()
       : '';
+    const extraNames = [c.companyName, c.indLastName, c.indFirstName, c.lastName, c.firstName]
+      .filter(Boolean).join(' ').toLowerCase();
     return (c.name && c.name.toLowerCase().includes(keyword)) ||
+      extraNames.includes(keyword) ||
       (c.address && c.address.toLowerCase().includes(keyword)) ||
       (c.building && c.building.toLowerCase().includes(keyword)) ||
       (c.room && c.room.toLowerCase().includes(keyword)) ||
@@ -5760,7 +5755,20 @@
           <div class="card-title-left">
             <span class="order-badge">${escapeHtml(orderText)}</span>
             ${statusBadgeHtml}
-            <span class="customer-name">${escapeHtml(c.name)}</span>
+            <span class="customer-name">${escapeHtml(c.name)}</span>${(() => {
+              const savedInd = buildFullName(
+                c.indLastName !== undefined ? c.indLastName : (!c.isCorp ? c.lastName : ''),
+                c.indFirstName !== undefined ? c.indFirstName : (!c.isCorp ? c.firstName : '')
+              );
+              const savedCorp = (c.companyName || (c.isCorp ? c.name : '') || '').trim();
+              if (c.isCorp && savedInd && savedInd !== c.name) {
+                return `<span style="font-size:12px;color:#555;font-weight:bold;">（個人: ${escapeHtml(savedInd)}）</span>`;
+              }
+              if (!c.isCorp && savedCorp && savedCorp !== c.name) {
+                return `<span style="font-size:12px;color:#5f3dc4;font-weight:bold;">（会社: ${escapeHtml(savedCorp)}）</span>`;
+              }
+              return '';
+            })()}
           </div>
           <span class="copies-badge${isMultiCopies ? ' multi-copies' : ''}">${copiesLabel}</span>
         </div>
@@ -5811,7 +5819,7 @@
     }
 
     const rawLast = isCorpMode ? document.getElementById('inputCompanyName').value : document.getElementById('inputLastName').value;
-    const rawFirst = isCorpMode ? document.getElementById('inputContactName').value : document.getElementById('inputFirstName').value;
+    const rawFirst = isCorpMode ? '' : document.getElementById('inputFirstName').value;
     const lastNorm = normalizeCompareStr(rawLast);
     const firstNorm = normalizeCompareStr(rawFirst);
     const nameNorm = lastNorm + firstNorm;
@@ -6238,33 +6246,21 @@
     if (firstNameAutoMoveTimer) clearTimeout(firstNameAutoMoveTimer);
 
     if (!isCorpMode) {
-      const lastVal = (document.getElementById('inputLastName').value || '').trim();
-      const firstVal = (document.getElementById('inputFirstName').value || '').trim();
-      const combined = buildFullName(lastVal, firstVal);
-      const companyInput = document.getElementById('inputCompanyName');
-      if (combined && companyInput && !companyInput.value.trim()) {
-        companyInput.value = combined;
-      }
       isCorpMode = true;
       renderCorpModeUI();
       checkStoppedCustomerMatches();
+      const companyInput = document.getElementById('inputCompanyName');
       if (companyInput) {
         companyInput.focus({ preventScroll: true });
       }
     } else {
-      const companyVal = (document.getElementById('inputCompanyName').value || '').trim();
-      const contactVal = (document.getElementById('inputContactName').value || '').trim();
-      const lastInput = document.getElementById('inputLastName');
-      const firstInput = document.getElementById('inputFirstName');
-      if (companyVal && lastInput && !lastInput.value.trim()) {
-        lastInput.value = companyVal;
-      }
-      if (contactVal && firstInput && !firstInput.value.trim()) {
-        firstInput.value = contactVal;
-      }
       isCorpMode = false;
       renderCorpModeUI();
       checkStoppedCustomerMatches();
+      const lastInput = document.getElementById('inputLastName');
+      if (lastInput) {
+        lastInput.focus({ preventScroll: true });
+      }
     }
   }
 
@@ -6300,14 +6296,23 @@
       document.getElementById('inputArea').value = target.area;
       document.getElementById('inputOrder').value = target.order;
 
-      const splitName = target.lastName !== undefined
+      isCorpMode = Boolean(target.isCorp);
+      const fallbackSplit = target.lastName !== undefined
         ? { lastName: target.lastName, firstName: target.firstName || '' }
         : splitFullName(target.name);
-      isCorpMode = Boolean(target.isCorp);
-      document.getElementById('inputLastName').value = splitName.lastName;
-      document.getElementById('inputFirstName').value = splitName.firstName;
-      document.getElementById('inputCompanyName').value = isCorpMode ? (target.lastName || target.name || '') : '';
-      document.getElementById('inputContactName').value = isCorpMode ? (target.firstName || '') : '';
+      const restoredIndLast = target.indLastName !== undefined
+        ? target.indLastName
+        : (isCorpMode ? '' : fallbackSplit.lastName);
+      const restoredIndFirst = target.indFirstName !== undefined
+        ? target.indFirstName
+        : (isCorpMode ? '' : fallbackSplit.firstName);
+      const restoredCompany = target.companyName !== undefined
+        ? target.companyName
+        : (isCorpMode ? (target.lastName || target.name || '') : '');
+
+      document.getElementById('inputLastName').value = restoredIndLast;
+      document.getElementById('inputFirstName').value = restoredIndFirst;
+      document.getElementById('inputCompanyName').value = restoredCompany;
 
       const { town, banchi } = splitTownAndBanchi(target.address);
       document.getElementById('inputTown').value = town;
@@ -6344,7 +6349,6 @@
       document.getElementById('inputLastName').value = '';
       document.getElementById('inputFirstName').value = '';
       document.getElementById('inputCompanyName').value = '';
-      document.getElementById('inputContactName').value = '';
       document.getElementById('inputTown').value = prevTown;
       document.getElementById('inputBanchi').value = '';
       document.getElementById('inputBuilding').value = prevBuilding;
@@ -6458,13 +6462,12 @@
   }
 
   function saveCustomer(continueAdding = false) {
-    const lastName = isCorpMode
-      ? document.getElementById('inputCompanyName').value.trim()
-      : document.getElementById('inputLastName').value.trim();
-    const firstName = isCorpMode
-      ? document.getElementById('inputContactName').value.trim()
-      : document.getElementById('inputFirstName').value.trim();
-    const fullName = buildFullName(lastName, firstName);
+    const indLastName = document.getElementById('inputLastName').value.trim();
+    const indFirstName = document.getElementById('inputFirstName').value.trim();
+    const companyNameVal = document.getElementById('inputCompanyName').value.trim();
+    const lastName = isCorpMode ? companyNameVal : indLastName;
+    const firstName = isCorpMode ? '' : indFirstName;
+    const fullName = isCorpMode ? companyNameVal : buildFullName(indLastName, indFirstName);
 
     if (!lastName) {
       alert(isCorpMode ? '会社名・店舗名を入力してください。' : '苗字を入力してください。');
@@ -6569,6 +6572,9 @@
       firstName: firstName,
       name: fullName,
       isCorp: Boolean(isCorpMode),
+      companyName: companyNameVal,
+      indLastName: indLastName,
+      indFirstName: indFirstName,
       address: combinedAddress,
       building: buildingVal,
       room: roomVal,
