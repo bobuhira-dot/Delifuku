@@ -2407,7 +2407,7 @@
         <div id="corpNameFields" style="display:none;">
           <div class="corp-single-wrap">
             <div class="address-sub-label">会社名・店舗名 *</div>
-            <input type="text" id="inputCompanyName" class="form-control" placeholder="例: 〇〇工業 / 〇〇食堂" oninput="checkStoppedCustomerMatches()">
+            <input type="text" id="inputCompanyName" class="form-control" placeholder="例: 〇〇工業 / 〇〇食堂" enterkeyhint="next" oninput="handleCompanyNameInput()" onkeydown="handleCompanyNameKeydown(event)">
           </div>
           <div class="form-hint">※個人名（苗字・名前）はそのまま保持されます。「保存して次を追加」で次へ進むと自動で個人モードに戻ります</div>
         </div>
@@ -2981,13 +2981,25 @@
 
   function scheduleMoveFromFirstName() {
     if (firstNameAutoMoveTimer) clearTimeout(firstNameAutoMoveTimer);
+    const compInput = document.getElementById('inputCompanyName');
+    if (compInput) {
+      compInput.addEventListener('compositionstart', () => {
+        isCompanyComposing = true;
+        if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
+      });
+      compInput.addEventListener('compositionend', () => {
+        isCompanyComposing = false;
+        scheduleMoveFromCompanyName();
+      });
+    }
+
     const firstInput = document.getElementById('inputFirstName');
     const townInput = document.getElementById('inputTown');
     const isNew = !document.getElementById('editCustomerId').value;
     if (!isNew || !firstInput || !townInput) return;
-    if (firstInput.value.trim().length >= 1 && townInput.value.trim() !== '') {
+    if (firstInput.value.trim().length >= 1) {
       firstNameAutoMoveTimer = setTimeout(() => {
-        if (!isFirstNameComposing && document.activeElement === firstInput && firstInput.value.trim().length >= 1 && townInput.value.trim() !== '') {
+        if (!isFirstNameComposing && document.activeElement === firstInput && firstInput.value.trim().length >= 1) {
           const banchiInput = document.getElementById('inputBanchi');
           if (banchiInput) banchiInput.focus();
         }
@@ -3001,10 +3013,23 @@
       lastInput.addEventListener('compositionstart', () => {
         isLastNameComposing = true;
         if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
+    if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
       });
       lastInput.addEventListener('compositionend', () => {
         isLastNameComposing = false;
         scheduleMoveToFirstName();
+      });
+    }
+
+    const compInput = document.getElementById('inputCompanyName');
+    if (compInput) {
+      compInput.addEventListener('compositionstart', () => {
+        isCompanyComposing = true;
+        if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
+      });
+      compInput.addEventListener('compositionend', () => {
+        isCompanyComposing = false;
+        scheduleMoveFromCompanyName();
       });
     }
 
@@ -3021,11 +3046,63 @@
     }
   }
 
+  let companyAutoMoveTimer = null;
+  let isCompanyComposing = false;
+
+  function moveToBanchiFromCompany() {
+    const banchiInput = document.getElementById('inputBanchi');
+    if (banchiInput) {
+      banchiInput.focus();
+    }
+  }
+
+  function handleCompanyNameKeydown(e) {
+    if (e.key === 'Enter' && !isCompanyComposing) {
+      e.preventDefault();
+      if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
+      moveToBanchiFromCompany();
+    }
+  }
+
+  function handleCompanyNameInput() {
+    checkStoppedCustomerMatches();
+    if (!isCompanyComposing) {
+      scheduleMoveFromCompanyName();
+    }
+  }
+
+  function scheduleMoveFromCompanyName() {
+    if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
+    const compInput = document.getElementById('inputCompanyName');
+    const isNew = !document.getElementById('editCustomerId').value;
+    if (!isNew || !compInput || !isCorpMode) return;
+    if (compInput.value.trim().length >= 1) {
+      companyAutoMoveTimer = setTimeout(() => {
+        if (!isCompanyComposing && isCorpMode && document.activeElement === compInput && compInput.value.trim().length >= 1) {
+          moveToBanchiFromCompany();
+        }
+      }, 950);
+    }
+  }
+
   function handleLastNameKeydown(e) {
     if (e.key === 'Enter' && !isLastNameComposing) {
       e.preventDefault();
       if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
-      const firstInput = document.getElementById('inputFirstName');
+    if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
+      const compInput = document.getElementById('inputCompanyName');
+    if (compInput) {
+      compInput.addEventListener('compositionstart', () => {
+        isCompanyComposing = true;
+        if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
+      });
+      compInput.addEventListener('compositionend', () => {
+        isCompanyComposing = false;
+        scheduleMoveFromCompanyName();
+      });
+    }
+
+    const firstInput = document.getElementById('inputFirstName');
       if (firstInput) firstInput.focus();
     }
   }
@@ -3037,11 +3114,24 @@
       const parts = val.split(/[\s ]+/);
       document.getElementById('inputLastName').value = parts[0] || '';
       const rest = parts.slice(1).join(' ');
-      const firstInput = document.getElementById('inputFirstName');
+      const compInput = document.getElementById('inputCompanyName');
+    if (compInput) {
+      compInput.addEventListener('compositionstart', () => {
+        isCompanyComposing = true;
+        if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
+      });
+      compInput.addEventListener('compositionend', () => {
+        isCompanyComposing = false;
+        scheduleMoveFromCompanyName();
+      });
+    }
+
+    const firstInput = document.getElementById('inputFirstName');
       if (rest && !firstInput.value) {
         firstInput.value = rest;
       }
       if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
+    if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
       firstInput.focus();
       return;
     }
@@ -3052,7 +3142,20 @@
 
   function scheduleMoveToFirstName() {
     if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
+    if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
     const lastInput = document.getElementById('inputLastName');
+    const compInput = document.getElementById('inputCompanyName');
+    if (compInput) {
+      compInput.addEventListener('compositionstart', () => {
+        isCompanyComposing = true;
+        if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
+      });
+      compInput.addEventListener('compositionend', () => {
+        isCompanyComposing = false;
+        scheduleMoveFromCompanyName();
+      });
+    }
+
     const firstInput = document.getElementById('inputFirstName');
     const isNew = !document.getElementById('editCustomerId').value;
     if (!isNew || !lastInput || !firstInput) return;
@@ -6243,6 +6346,7 @@
 
   function toggleCorpMode() {
     if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
+    if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
     if (firstNameAutoMoveTimer) clearTimeout(firstNameAutoMoveTimer);
 
     if (!isCorpMode) {
@@ -6266,6 +6370,7 @@
 
   function openCustomerModal(id = null, keepPreviousPlace = false, previousArea = null) {
     if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
+    if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
 
     const areaSelect = document.getElementById('inputArea');
     areaSelect.innerHTML = '';
@@ -6389,6 +6494,7 @@
 
   function closeCustomerModal() {
     if (lastNameAutoMoveTimer) clearTimeout(lastNameAutoMoveTimer);
+    if (companyAutoMoveTimer) clearTimeout(companyAutoMoveTimer);
     if (firstNameAutoMoveTimer) clearTimeout(firstNameAutoMoveTimer);
     scrollModalToTop();
     document.getElementById('continuousToast').style.display = 'none';
