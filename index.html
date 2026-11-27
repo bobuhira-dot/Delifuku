@@ -5938,12 +5938,15 @@
       return;
     }
 
+    const hasSpecificPlace = banchiNorm.length >= 1 || bldgNorm.length >= 2 || roomNorm.length >= 1;
     const stoppedCustomers = appData.customers.filter(c => c.stopped);
     const matches = stoppedCustomers.filter(c => {
       const cName = normalizeCompareStr(c.name);
       const cFullAddr = normalizeCompareStr((c.address || '') + (c.building || '') + (c.room || ''));
-      const nameHit = nameNorm.length >= 1 && cName.includes(nameNorm);
-      const addrHit = combinedAddrNorm.length >= 2 && cFullAddr && cFullAddr.includes(combinedAddrNorm);
+      const nameHit = nameNorm.length >= 2
+        ? cName.includes(nameNorm)
+        : (nameNorm.length === 1 && cName.startsWith(nameNorm));
+      const addrHit = hasSpecificPlace && combinedAddrNorm.length >= 3 && cFullAddr && cFullAddr.includes(combinedAddrNorm);
       return nameHit || addrHit;
     });
 
